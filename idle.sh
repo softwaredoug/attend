@@ -7,9 +7,16 @@ rm -f /tmp/total_idle_time
 
 echo 0 > /tmp/total_idle_time
 
+CONTINUE=1
+terminate() {
+  CONTINUE=0
+}
+
+trap terminate SIGTERM SIGINT
+
 total_idle=0.0
 check_frequency="$1"
-while true; do
+while [ $CONTINUE -eq 1 ] ; do
   idle=$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}')
   # Accumulate idle if more than sleep period
   if [ $(echo "$idle > $check_frequency" | bc) -eq 1 ]; then

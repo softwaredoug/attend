@@ -1,5 +1,8 @@
 #!/bin/bash
 
+PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_process.pid)
+OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_output.txt)
+
 # These apps we can use the window name to get the front tab
 # And use that to define the 'focus'
 app_tabs_change_focus() {
@@ -66,13 +69,66 @@ update_scores() {
   fi
 }
 
+output() {
+  echo "$1" >> $OUTPUT_FILE
+}
+
+report() {
+  kill $IDLE_PID
+
+  rm $OUTPUT_FILE
+  touch $OUTPUT_FILE
+
+  work_end=$(gdate +"%s%3N")
+  session_length_secs=$(echo "($work_end - $WORK_BEGIN) / 1000" | bc)
+  output ""
+  output "Work session done!"
+  # Write date and score to ~/.focus_scores
+  # Check the highest score
+  highest_avg=$(sort -k8 -n -r ~/.focus_scores 2> /dev/null | head -n 1 | awk '{print $8}')
+  highest_max=$(sort -k9 -n -r ~/.focus_scores 2> /dev/null | head -n 1 | awk '{print $9}')
+  # If the current score is higher than the highest score
+
+  avg_score=$(echo "$TOT_SCORE / $NUM_SWITCHES" | bc -l)
+  output "You started working at $WORK_BEGIN_TS"
+  output "Work session length: $session_length_secs seconds"
+  output "----"
+  output "Average focus score: $avg_score"
+  output "Max focus score: $MAX_SCORE"
+  output "Num task switches: $NUM_SWITCHES"
+  output "Total idle time: $TOT_IDLE"
+
+  output "----"
+  output "Highest average score: $highest_avg"
+  output "Highest     max score: $highest_max"
+
+  if [ ! -f ~/.focus_scores ]; then
+    touch ~/.focus_scores
+  else
+    if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
+      output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+      output "New high average score! -- $avg_score"
+      afplay ./tada.mp3 &
+    fi
+    
+    if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
+      output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+      output "New high max score! -- $MAX_SCORE"
+      afplay ./tada.mp3 &
+    fi
+  fi
+  echo "$(gdate +"%Y-%m-%dT%H:%M") $WORK_BEGIN_TS $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> ~/.focus_scores
+  exit 0
+}
+
+
 track_focus() {
   # Spawn idle time tracker
   ./idle.sh 10 &
   IDLE_PID=$!
 
   # loop forever, sleep for 1 second
-  while true; do
+  while [[ -f $PID_FILE ]] ; do
       sleep 0.1
       # get the focused app
       focus=$(osascript focusedapp.scpt 2> /dev/null)
@@ -92,57 +148,36 @@ track_focus() {
           LAST_TIME=$(gdate +"%s%3N")
       fi
   done
-}
-
-ctrl_c() {
   update_scores $time
-
-  kill $IDLE_PID
-
-  work_end=$(gdate +"%s%3N")
-  session_length_secs=$(echo "($work_end - $WORK_BEGIN) / 1000" | bc)
-  echo ""
-  echo "Work session done!"
-  # Write date and score to ~/.focus_scores
-  # Check the highest score
-  highest_avg=$(sort -k8 -n -r ~/.focus_scores 2> /dev/null | head -n 1 | awk '{print $8}')
-  highest_max=$(sort -k9 -n -r ~/.focus_scores 2> /dev/null | head -n 1 | awk '{print $9}')
-  # If the current score is higher than the highest score
-
-  avg_score=$(echo "$TOT_SCORE / $NUM_SWITCHES" | bc -l)
-  echo "You started working at $WORK_BEGIN_TS"
-  echo "Work session length: $session_length_secs seconds"
-  echo "----"
-  echo "Average focus score: $avg_score"
-  echo "Max focus score: $MAX_SCORE"
-  echo "Num task switches: $NUM_SWITCHES"
-  echo "Total idle time: $TOT_IDLE"
-
-  echo "----"
-  echo "Highest average score: $highest_avg"
-  echo "Highest     max score: $highest_max"
-
-  if [ ! -f ~/.focus_scores ]; then
-    touch ~/.focus_scores
-  else
-    if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
-      echo "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-      echo "New high average score! -- $avg_score"
-      afplay ./tada.mp3 &
-    fi
-    
-    if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
-      echo "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-      echo "New high max score! -- $MAX_SCORE"
-      afplay ./tada.mp3 &
-    fi
-  fi
-  echo "$(gdate +"%Y-%m-%dT%H:%M") $WORK_BEGIN_TS $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> ~/.focus_scores
-  exit 0
+  report
 }
-
 
 # On Ctrl+C, print the score and exit
-trap ctrl_c INT
 
-track_focus
+if [[ "$1" == "start" ]]; then
+  if [[ -f $PID_FILE ]]; then
+    echo "Focus already running"
+    exit 1
+  fi
+  touch $PID_FILE
+  track_focus & 
+  pid=$!
+  echo "$pid" > $PID_FILE
+elif [[ "$1" == "stop" ]]; then
+  if [[ -f $PID_FILE ]]; then
+    pid=$(cat $PID_FILE)
+    echo "Stopping focus at pid $pid"
+    rm $PID_FILE
+    # Wait until output file has lines
+    while [[ ! -s $OUTPUT_FILE ]]; do
+      sleep 0.1
+    done
+    cat $OUTPUT_FILE
+  else
+    echo "No focus process running"
+    exit 1
+  fi
+else
+  echo "Usage: focus.sh [start|stop]"
+  exit 1
+fi
