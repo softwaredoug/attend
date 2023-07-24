@@ -36,6 +36,7 @@ focus_name() {
 
 
 track_focus() {
+  score=0
 
   # loop forever, sleep for 1 second
   while true; do
@@ -46,7 +47,7 @@ track_focus() {
       # if the focused app is not the same as the last focused app
       if [ "$focus" != "$lastfocus" ]; then
           # play unpleasant sound
-          afplay /System/Library/Sounds/Funk.aiff & 
+          afplay /System/Library/Sounds/Funk.aiff &
           # if the last focused app is not empty
           if [ "$lastfocus" != "" ]; then
               # get the current time in milliseconds
@@ -55,8 +56,9 @@ track_focus() {
               let "time = $time - $lasttime"
               # if the time spent is greater than 0
               if [ "$time" -gt "0" ]; then
-                  # print the time spent on the last focused app
-                  echo "$lastfocus $time"
+                  # Add 1.1^time to the score
+                  score=$(echo "$score + 1.1^($time / 1000)" | bc)
+                  echo "Your score is $score"
               fi
           fi
           # set the last focused app to the current focused app
