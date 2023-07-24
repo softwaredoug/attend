@@ -7,6 +7,7 @@ tell application "System Events"
 end tell
 
 tell frontAppProcess
+    set window_name to ""
     if count of windows > 0 then
        set window_name to name of front window
     end if
