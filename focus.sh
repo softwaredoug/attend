@@ -48,6 +48,18 @@ LAST_IDLE=0
 TOT_IDLE=0
 IDLE_PID=0
 
+output() {
+  echo "$1" >> $OUTPUT_FILE
+}
+
+scoring_function() {
+  time=$1
+  focus_peak=180
+  power=$(echo "-(0.05 * ($time - $focus_peak) )" | bc)
+  score=$(echo "$focus_peak / (e($power) + $focus_peak)" | bc -l)
+  echo "$score"
+}
+
 update_scores() {
   time=$(gdate +"%s%3N" )
   # calculate the time spent on the last focused app
@@ -58,8 +70,9 @@ update_scores() {
     # Add 1.1^time to the score
     time=$(echo "$time - $this_idle" | bc)
     
-    this_score=$(echo "1.1^($time / 1000)" | bc)
-    TOT_SCORE=$(echo "$TOT_SCORE + 1.1^($time / 1000)" | bc)
+    time_secs=$(echo "$time / 1000" | bc)
+    this_score=$(scoring_function "$time_secs")
+    TOT_SCORE=$(echo "$TOT_SCORE + $this_score" | bc)
     TOT_IDLE=$(echo "$TOT_IDLE + $this_idle" | bc)
     let "NUM_SWITCHES = $NUM_SWITCHES + 1"
     if [ $(echo "$this_score > $MAX_SCORE" | bc) -eq 1 ]; then
@@ -67,10 +80,6 @@ update_scores() {
     fi
     LAST_IDLE=$idle
   fi
-}
-
-output() {
-  echo "$1" >> $OUTPUT_FILE
 }
 
 report() {
