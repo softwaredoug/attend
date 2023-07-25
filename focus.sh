@@ -1,26 +1,20 @@
 #!/bin/bash
 
-IDLE() {
+idle_call() {
   ./idle.sh "$@"
 }
 
-GET_FOCUS() {
+focus_call() {
     focus=$(osascript focusedapp.scpt 2> /dev/null)
     focus=$(focus_name "$focus")
     echo "$focus"
 }
 
-SLEEP() {
-  sleep $1
-}
-
-AFPLAY() {
-  afplay $1 &
-}
-
-GDATE() {
-  gdate "$@"
-}
+GET_FOCUS=focus_call
+SLEEP=sleep
+AFPLAY=afplay
+GDATE=gdate
+IDLE=idle_call
 
 if [[ -f 'idle_mock' ]]; then
   LOG_FILE="/tmp/focus_log.txt"
@@ -41,7 +35,6 @@ fi
 
 TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
-
 
 #------------------------------
 
@@ -201,7 +194,7 @@ track_focus() {
   while [[ -f $PID_FILE ]] ; do
       $SLEEP 0.1
       # get the focused app
-      focus=$(GET_FOCUS)
+      focus=$($GET_FOCUS)
       # if the focused app is not the same as the last focused app
       if [ "$focus" != "$lastfocus" ]; then
           # play unpleasant sound
@@ -223,6 +216,7 @@ wait_for_process() {
   num_processes=$(ps | grep "$pid.*focus" | grep -v grep | wc -l)
   while [ "$num_processes" -ge "1" ]; do
     $SLEEP 1
+    echo "Stopping..."
     num_processes=$(ps | grep "$pid.*focus" | grep -v grep | wc -l)
   done
 }

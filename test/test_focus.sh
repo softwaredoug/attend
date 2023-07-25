@@ -77,8 +77,8 @@ single_focus_at_length() {
   on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
   resp_on_call_count_gte 4 ' if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
 
-  resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"; fi' focus_mock
-  resp_on_call_count 2 'echo "Terminal"; fi' focus_mock
+  resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 2 'echo "Terminal"' focus_mock
 }
 
 
@@ -143,12 +143,12 @@ test_focus_long_focus_scores_near_actual_time() {
   max_score=$(get_stat "Max focus score")
   check_gt $max_score 2900
   if [[ $? -ne 0 ]]; then
-    echo "max_score: $max_score"
+    echo "gt max_score: $max_score > 2900"
     return 1
   fi
   check_lt $max_score 3100
   if [[ $? -ne 0 ]]; then
-    echo "max_score: $max_score"
+    echo "lt max_score: $max_score < 3100"
     return 1
   fi
 }
