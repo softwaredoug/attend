@@ -1,5 +1,7 @@
 # focus
 
+[![Bash Tests](https://github.com/softwaredoug/focus/actions/workflows/test.yml/badge.svg)](https://github.com/softwaredoug/focus/actions/workflows/test.yml)
+
 Scores your work sessions based on how little you task switch.
 
 ```
