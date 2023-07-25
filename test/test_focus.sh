@@ -43,7 +43,6 @@ test_focus_produces_output() {
   ./focus.sh start
   sleep 0.1
   ./focus.sh stop
-  sleep 1
   if [[ -f $OUTPUT_FILE ]]; then
     return 0
   else

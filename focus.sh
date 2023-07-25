@@ -15,7 +15,7 @@ SLEEP() {
 }
 
 AFPLAY() {
-  afplay $1
+  afplay $1 &
 }
 
 GDATE() {
@@ -38,8 +38,6 @@ else
   PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_process.pid)
   OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_output.txt)
 fi
-
-
 
 
 #------------------------------
@@ -166,13 +164,13 @@ report() {
     if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
       output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
       output "New high average score! -- $avg_score"
-      $AFPLAY ./tada.mp3 &
+      $AFPLAY ./tada.mp3
     fi
     
     if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
       output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
       output "New high max score! -- $MAX_SCORE"
-      $AFPLAY ./tada.mp3 &
+      $AFPLAY ./tada.mp3
     fi
   fi
   echo "$($GDATE +"%Y-%m-%dT%H:%M") $WORK_BEGIN_TS $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> $LOG_FILE
@@ -193,7 +191,7 @@ track_focus() {
       # if the focused app is not the same as the last focused app
       if [ "$focus" != "$lastfocus" ]; then
           # play unpleasant sound
-          $AFPLAY /System/Library/Sounds/Funk.aiff &
+          $AFPLAY /System/Library/Sounds/Funk.aiff
           # if the last focused app is not empty
           if [ "$lastfocus" != "" ]; then
               # get the current time in milliseconds
@@ -207,6 +205,14 @@ track_focus() {
   done
   update_scores $time
   report
+}
+
+wait_for_process() {
+  processes=$(ps | grep "$pid.*focus" | wc -l)
+  while [ "$processes" -gt "1" ]; do
+    $SLEEP 1
+    processes=$(ps | grep "$pid.*focus" | wc -l)
+  done
 }
 
 # On Ctrl+C, print the score and exit
@@ -225,16 +231,14 @@ elif [[ "$1" == "stop" ]]; then
     pid=$(cat $PID_FILE)
     echo "Stopping focus at pid $pid"
     rm $PID_FILE
-    # Wait until output file has lines
-    while [[ ! -s $OUTPUT_FILE ]]; do
-      sleep 0.1
-    done
+    wait_for_process $pid
+    echo "Process stopped"
     cat $OUTPUT_FILE
   else
     echo "No focus process running"
     exit 1
   fi
 else
-  echo "Usage: focus.sh [start|stop]"
+  echo "Usage: focus [start|stop]"
   exit 1
 fi
