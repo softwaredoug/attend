@@ -221,6 +221,7 @@ track_focus() {
 
 wait_for_process() {
   processes=$(ps | grep "$pid.*focus" | wc -l)
+  echo $processes
   while [ "$processes" -gt "1" ]; do
     $SLEEP 1
     processes=$(ps | grep "$pid.*focus" | wc -l)
