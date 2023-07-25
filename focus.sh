@@ -1,10 +1,53 @@
 #!/bin/bash
 
-PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_process.pid)
-OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_output.txt)
+IDLE() {
+  ./idle.sh "$@"
+}
+
+GET_FOCUS() {
+    focus=$(osascript focusedapp.scpt 2> /dev/null)
+    focus=$(focus_name "$focus")
+    echo "$focus"
+}
+
+SLEEP() {
+  sleep $1
+}
+
+AFPLAY() {
+  afplay $1
+}
+
+GDATE() {
+  gdate "$@"
+}
+
+if [[ -f 'idle_mock' ]]; then
+  LOG_FILE="/tmp/focus_log.txt"
+  OUTPUT_FILE="/tmp/focus_output.txt"
+  PID_FILE="/tmp/focus_process.pid"
+
+  TEST_MODE=1
+  IDLE='./idle_mock'
+  GET_FOCUS="./focus_mock"
+  SLEEP="./sleep_mock"
+  AFPLAY="./afplay_mock"
+  GDATE="./gdate_mock"
+else
+  LOG_FILE='./focus_log.txt'
+  PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_process.pid)
+  OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_output.txt)
+fi
+
+
+
+
+#------------------------------
 
 # These apps we can use the window name to get the front tab
 # And use that to define the 'focus'
+# Currently just clicking a link also changes title, which 
+# probable shouldn't count as a focus change
 app_tabs_change_focus() {
   app_name=$1
   case $app_name in
@@ -40,9 +83,9 @@ focus_name() {
 
 TOT_SCORE=0
 MAX_SCORE=0
-NUM_SWITCHES=0
-WORK_BEGIN=$(gdate +"%s%3N")
-WORK_BEGIN_TS=$(gdate +"%Y-%m-%dT%H:%M")
+NUM_SWITCHES=1
+WORK_BEGIN=$($GDATE +"%s%3N")
+WORK_BEGIN_TS=$($GDATE +"%Y-%m-%dT%H:%M")
 LAST_TIME=0
 LAST_IDLE=0
 TOT_IDLE=0
@@ -54,7 +97,7 @@ output() {
 
 scoring_function() {
   time=$1
-  # Focus at focus_mid seconds treats seconds as 0.
+  # Focus at focus_full seconds treats seconds as full time focus
   focus_full=360
   focus_mid=$(echo "$focus_full / 2" | bc)
   power=$(echo "-(0.005 * ($time - $focus_mid) )" | bc)
@@ -67,7 +110,7 @@ scoring_function() {
 }
 
 update_scores() {
-  time=$(gdate +"%s%3N" )
+  time=$($GDATE +"%s%3N" )
   # calculate the time spent on the last focused app
   idle=$(cat /tmp/total_idle_time)
   this_idle=$(echo "$idle - $LAST_IDLE" | bc)
@@ -89,12 +132,12 @@ update_scores() {
 }
 
 report() {
-  kill $IDLE_PID
+  kill $IDLE_PID 2> /dev/null
 
-  rm $OUTPUT_FILE
+  rm -f  $OUTPUT_FILE
   touch $OUTPUT_FILE
 
-  work_end=$(gdate +"%s%3N")
+  work_end=$($GDATE +"%s%3N")
   session_length_secs=$(echo "($work_end - $WORK_BEGIN) / 1000" | bc)
   output ""
   output "Work session done!"
@@ -123,35 +166,34 @@ report() {
     if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
       output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
       output "New high average score! -- $avg_score"
-      afplay ./tada.mp3 &
+      $AFPLAY ./tada.mp3 &
     fi
     
     if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
       output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
       output "New high max score! -- $MAX_SCORE"
-      afplay ./tada.mp3 &
+      $AFPLAY ./tada.mp3 &
     fi
   fi
-  echo "$(gdate +"%Y-%m-%dT%H:%M") $WORK_BEGIN_TS $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> ~/.focus_scores
+  echo "$($GDATE +"%Y-%m-%dT%H:%M") $WORK_BEGIN_TS $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> $LOG_FILE
   exit 0
 }
 
 
 track_focus() {
   # Spawn idle time tracker
-  ./idle.sh 10 &
+  $IDLE 10 &
   IDLE_PID=$!
 
   # loop forever, sleep for 1 second
   while [[ -f $PID_FILE ]] ; do
-      sleep 0.1
+      $SLEEP 0.1
       # get the focused app
-      focus=$(osascript focusedapp.scpt 2> /dev/null)
-      focus=$(focus_name "$focus")
+      focus=$(GET_FOCUS)
       # if the focused app is not the same as the last focused app
       if [ "$focus" != "$lastfocus" ]; then
           # play unpleasant sound
-          afplay /System/Library/Sounds/Funk.aiff &
+          $AFPLAY /System/Library/Sounds/Funk.aiff &
           # if the last focused app is not empty
           if [ "$lastfocus" != "" ]; then
               # get the current time in milliseconds
@@ -160,7 +202,7 @@ track_focus() {
           # set the last focused app to the current focused app
           lastfocus=$focus
           # set the last time to the current time
-          LAST_TIME=$(gdate +"%s%3N")
+          LAST_TIME=$($GDATE +"%s%3N")
       fi
   done
   update_scores $time
