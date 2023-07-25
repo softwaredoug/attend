@@ -39,6 +39,9 @@ else
   OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_output.txt)
 fi
 
+TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
+MS_PATTERN="+%s%3N"
+
 
 #------------------------------
 
@@ -78,12 +81,11 @@ focus_name() {
 }
 
 
-
+# Global state for this
+# session
 TOT_SCORE=0
 MAX_SCORE=0
 NUM_SWITCHES=1
-WORK_BEGIN=$($GDATE +"%s%3N")
-WORK_BEGIN_TS=$($GDATE +"%Y-%m-%dT%H:%M")
 LAST_TIME=0
 LAST_IDLE=0
 TOT_IDLE=0
@@ -108,17 +110,18 @@ scoring_function() {
 }
 
 update_scores() {
-  time=$($GDATE +"%s%3N" )
+  time=$($GDATE $MS_PATTERN )
   # calculate the time spent on the last focused app
   idle=$(cat /tmp/total_idle_time)
   this_idle=$(echo "$idle - $LAST_IDLE" | bc)
-  let "time = $time - $LAST_TIME"
-  if [ "$time" -gt "0" ]; then
-    # Add 1.1^time to the score
-    time=$(echo "$time - $this_idle" | bc)
-    
-    time_secs=$(echo "$time / 1000" | bc)
-    this_score=$(scoring_function "$time_secs")
+  let "time_diff = $time - $LAST_TIME"
+  if [ "$time_diff" -gt "0" ]; then
+    time_no_idle=$(echo "$time_diff - $this_idle" | bc)
+    time_diff_secs=$(echo "$time_no_idle / 1000" | bc)
+    this_score=$(scoring_function "$time_diff_secs")
+
+    output "TIME: $time LAST_TIME: $LAST_TIME TIME_DIFF_SECS: $time_diff_secs SCORE: $this_score IDLE $this_idle TIME_NO_IDLE: $time_no_idle"
+
     TOT_SCORE=$(echo "$TOT_SCORE + $this_score" | bc)
     TOT_IDLE=$(echo "$TOT_IDLE + $this_idle" | bc)
     let "NUM_SWITCHES = $NUM_SWITCHES + 1"
@@ -126,17 +129,22 @@ update_scores() {
       MAX_SCORE=$this_score
     fi
     LAST_IDLE=$idle
+    LAST_TIME=$time
   fi
 }
 
 report() {
+  work_begin="$1"
+  work_begin_ts="$2"
+  work_end=$($GDATE $MS_PATTERN)
+  word_end_ts=$($GDATE $TIMESTAMP_PATTERN)
+  
   kill $IDLE_PID 2> /dev/null
 
-  rm -f  $OUTPUT_FILE
-  touch $OUTPUT_FILE
+  # rm -f  $OUTPUT_FILE
+  # touch $OUTPUT_FILE
 
-  work_end=$($GDATE +"%s%3N")
-  session_length_secs=$(echo "($work_end - $WORK_BEGIN) / 1000" | bc)
+  session_length_secs=$(echo "($work_end - $work_begin) / 1000" | bc)
   output ""
   output "Work session done!"
   # Write date and score to ~/.focus_scores
@@ -146,7 +154,7 @@ report() {
   # If the current score is higher than the highest score
 
   avg_score=$(echo "$TOT_SCORE / $NUM_SWITCHES" | bc -l)
-  output "You started working at $WORK_BEGIN_TS"
+  output "You started working at $work_begin_ts"
   output "Work session length: $session_length_secs seconds"
   output "----"
   output "Average focus score: $avg_score"
@@ -173,7 +181,7 @@ report() {
       $AFPLAY ./tada.mp3
     fi
   fi
-  echo "$($GDATE +"%Y-%m-%dT%H:%M") $WORK_BEGIN_TS $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> $LOG_FILE
+  echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> $LOG_FILE
   exit 0
 }
 
@@ -182,6 +190,12 @@ track_focus() {
   # Spawn idle time tracker
   $IDLE 10 &
   IDLE_PID=$!
+
+  work_begin=$($GDATE $MS_PATTERN)
+  work_begin_ts=$($GDATE $TIMESTAMP_PATTERN)
+  LAST_TIME=$work_begin
+
+  output "Work session started at $work_begin_ts -- $work_begin"
 
   # loop forever, sleep for 1 second
   while [[ -f $PID_FILE ]] ; do
@@ -195,16 +209,14 @@ track_focus() {
           # if the last focused app is not empty
           if [ "$lastfocus" != "" ]; then
               # get the current time in milliseconds
-              update_scores "$time"
+              update_scores
           fi
           # set the last focused app to the current focused app
           lastfocus=$focus
-          # set the last time to the current time
-          LAST_TIME=$($GDATE +"%s%3N")
       fi
   done
-  update_scores $time
-  report
+  update_scores
+  report "$work_begin" "$work_begin_ts"
 }
 
 wait_for_process() {
