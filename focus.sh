@@ -83,6 +83,7 @@ LAST_TIME=0
 LAST_IDLE=0
 TOT_IDLE=0
 IDLE_PID=0
+MAX_APP=""
 
 output() {
   echo "$1" >> $OUTPUT_FILE
@@ -113,13 +114,12 @@ update_scores() {
     time_diff_secs=$(echo "$time_no_idle / 1000" | bc)
     this_score=$(scoring_function "$time_diff_secs")
 
-    output "TIME: $time LAST_TIME: $LAST_TIME TIME_DIFF_SECS: $time_diff_secs SCORE: $this_score IDLE $this_idle TIME_NO_IDLE: $time_no_idle"
-
     TOT_SCORE=$(echo "$TOT_SCORE + $this_score" | bc)
     TOT_IDLE=$(echo "$TOT_IDLE + $this_idle" | bc)
     let "NUM_SWITCHES = $NUM_SWITCHES + 1"
     if [ $(echo "$this_score > $MAX_SCORE" | bc) -eq 1 ]; then
       MAX_SCORE=$this_score
+      MAX_APP=$1
     fi
     LAST_IDLE=$idle
     LAST_TIME=$time
@@ -152,6 +152,7 @@ report() {
   output "----"
   output "Average focus score: $avg_score"
   output "Max focus score: $MAX_SCORE"
+  output "Most focused app: $MAX_APP"
   output "Num task switches: $NUM_SWITCHES"
   output "Total idle time: $TOT_IDLE"
 
@@ -188,13 +189,15 @@ track_focus() {
   work_begin_ts=$($GDATE $TIMESTAMP_PATTERN)
   LAST_TIME=$work_begin
 
-  output "Work session started at $work_begin_ts -- $work_begin"
+  lastfocus=$($GET_FOCUS)
+  output "Work session started at $work_begin_ts -- $work_begin -- $lastfocus"
 
   # loop forever, sleep for 1 second
   while [[ -f $PID_FILE ]] ; do
       $SLEEP 0.1
       # get the focused app
       focus=$($GET_FOCUS)
+      output "FOCUS -- $focus"
       # if the focused app is not the same as the last focused app
       if [ "$focus" != "$lastfocus" ]; then
           # play unpleasant sound
@@ -202,12 +205,13 @@ track_focus() {
           # if the last focused app is not empty
           if [ "$lastfocus" != "" ]; then
               # get the current time in milliseconds
-              update_scores
+              update_scores "$focus"
           fi
           # set the last focused app to the current focused app
           lastfocus=$focus
       fi
   done
+  focus=$($GET_FOCUS)
   update_scores
   report "$work_begin" "$work_begin_ts"
 }
@@ -216,7 +220,6 @@ wait_for_process() {
   num_processes=$(ps | grep "$pid.*focus" | grep -v grep | wc -l)
   while [ "$num_processes" -ge "1" ]; do
     $SLEEP 1
-    echo "Stopping..."
     num_processes=$(ps | grep "$pid.*focus" | grep -v grep | wc -l)
   done
 }

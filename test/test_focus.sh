@@ -11,7 +11,7 @@ mock() {
 }
 
 clean_mock() {
-  rm $1_mock
+  # rm $1_mock
   rm -f ".last_$1_mock"_args
 
 }
@@ -79,6 +79,7 @@ single_focus_at_length() {
 
   resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
   resp_on_call_count 2 'echo "Terminal"' focus_mock
+  resp_on_call_count_gte 3 'echo "Youdontwannaknow"' focus_mock
 }
 
 
@@ -138,7 +139,7 @@ test_focus_produces_output() {
 test_focus_long_focus_scores_near_actual_time() {
   single_focus_at_length 3000
   ./focus.sh start
-  sleep 1
+  sleep 0.1
   ./focus.sh stop
   max_score=$(get_stat "Max focus score")
   check_gt $max_score 2900
@@ -149,6 +150,18 @@ test_focus_long_focus_scores_near_actual_time() {
   check_lt $max_score 3100
   if [[ $? -ne 0 ]]; then
     echo "lt max_score: $max_score < 3100"
+    return 1
+  fi
+}
+
+test_focus_tracks_longest_app() {
+  single_focus_at_length 3000
+  ./focus.sh start
+  sleep 0.1
+  ./focus.sh stop
+  longest_app=$(get_stat "Most focused app")
+  echo "longest_app: $longest_app"
+  if [[ $longest_app != "Terminal" ]]; then
     return 1
   fi
 }
@@ -164,8 +177,6 @@ test_focus_short_focus_scores_a_lot_less_than_time() {
     return 1
   fi
 }
-
-
 
 ###########################################
 # Run all functions that start with "test_"
