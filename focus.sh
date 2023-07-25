@@ -54,9 +54,15 @@ output() {
 
 scoring_function() {
   time=$1
-  focus_peak=180
-  power=$(echo "-(0.05 * ($time - $focus_peak) )" | bc)
-  score=$(echo "$focus_peak / (e($power) + $focus_peak)" | bc -l)
+  # Focus at focus_mid seconds treats seconds as 0.
+  focus_full=360
+  focus_mid=$(echo "$focus_full / 2" | bc)
+  power=$(echo "-(0.005 * ($time - $focus_mid) )" | bc)
+  # Logistic function for time multiple
+  slope=$(echo "1 / (e($power) + 1)" | bc -l)
+
+  # score is effective seconds
+  score=$(echo "$time * $slope" | bc -l)
   echo "$score"
 }
 
