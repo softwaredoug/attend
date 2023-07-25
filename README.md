@@ -9,18 +9,17 @@ Scores your work sessions based on how little you task switch.
 ```
 
 ```
-./focus.sh stop
-Stopping focus at pid 72067
-
 Work session done!
-You started working at 2023-07-24T17:57
-Work session length: 4 seconds
+----------------------------------------
+...All scores in effective seconds...
+   the more time you spend on a task, the more the seconds accumulate!...
+----------------------------------------
+You started working at 2023-07-25T16:49:04
+Work session length: 25 seconds
 ----
-Average focus score: 1.30000000000000000000
-Max focus score: 1.3
-Num task switches: 1
+Average focus score: 1.36846972804751812470
+Max focus score: 3.61841740796953469424
+Most focused app: Terminal
+Num task switches: 5
 Total idle time: 0
-----
-Highest average score: 2.30000000000000000000
-Highest     max score: 2.3
 ```
