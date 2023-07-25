@@ -163,6 +163,10 @@ report() {
   session_length_secs=$(echo "($work_end - $work_begin) / 1000" | bc)
   output ""
   output "Work session done!"
+  output "----------------------------------------"
+  output "...All scores in effective seconds..."
+  output "   the more time you spend on a task, the more the seconds accumulate!..."
+  output "----------------------------------------"
   # Write date and score to ~/.focus_scores
   # Check the highest score
   highest_avg=$(sort -k8 -n -r ~/.focus_scores 2> /dev/null | head -n 1 | awk '{print $8}')
