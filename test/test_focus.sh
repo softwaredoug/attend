@@ -11,7 +11,7 @@ mock() {
 }
 
 clean_mock() {
-  # rm $1_mock
+  rm $1_mock
   rm -f ".last_$1_mock"_args
 
 }
@@ -157,11 +157,11 @@ test_focus_long_focus_scores_near_actual_time() {
 test_focus_tracks_longest_app() {
   single_focus_at_length 3000
   ./focus.sh start
-  sleep 0.1
+  sleep 1
   ./focus.sh stop
   longest_app=$(get_stat "Most focused app")
   echo "longest_app: $longest_app"
-  if [[ $longest_app != "Terminal" ]]; then
+  if [[ $longest_app != "Google Chrome || https://www.google.com/" ]]; then
     return 1
   fi
 }
@@ -169,11 +169,23 @@ test_focus_tracks_longest_app() {
 test_focus_short_focus_scores_a_lot_less_than_time() {
   single_focus_at_length 1
   ./focus.sh start
-  sleep 0.1
+  sleep 1
   ./focus.sh stop
   max_score=$(get_stat "Max focus score")
   check_lt "$max_score" "1"
   if [[ $? -ne 0 ]]; then
+    return 1
+  fi
+}
+
+test_focus_output_missing_log() {
+  single_focus_at_length 3000
+  ./focus.sh start
+  sleep 1
+  ./focus.sh stop
+  cat $OUTPUT_FILE | grep -q "LOG START"
+  success=$?
+  if [[ $success -eq 0 ]]; then
     return 1
   fi
 }

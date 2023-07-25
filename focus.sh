@@ -10,9 +10,13 @@ focus_call() {
     echo "$focus"
 }
 
+afplay_call() {
+  afplay "$@" &
+}
+
 GET_FOCUS=focus_call
 SLEEP=sleep
-AFPLAY=afplay
+AFPLAY=afplay_call
 GDATE=gdate
 IDLE=idle_call
 
@@ -88,6 +92,11 @@ MAX_APP=""
 output() {
   echo "$1" >> $OUTPUT_FILE
 }
+
+log() {
+  output "$1"
+}
+log "LOG START"
 
 scoring_function() {
   time=$1
@@ -197,22 +206,23 @@ track_focus() {
       $SLEEP 0.1
       # get the focused app
       focus=$($GET_FOCUS)
-      output "FOCUS -- $focus"
+      log "FOCUS -- $focus"
       # if the focused app is not the same as the last focused app
       if [ "$focus" != "$lastfocus" ]; then
+          log "FOCUS SWITCH $lastfocus -> $focus"
           # play unpleasant sound
           $AFPLAY /System/Library/Sounds/Funk.aiff
           # if the last focused app is not empty
           if [ "$lastfocus" != "" ]; then
               # get the current time in milliseconds
-              update_scores "$focus"
+              update_scores "$lastfocus"
           fi
           # set the last focused app to the current focused app
           lastfocus=$focus
       fi
   done
   focus=$($GET_FOCUS)
-  update_scores
+  update_scores "$lastfocus"
   report "$work_begin" "$work_begin_ts"
 }
 
