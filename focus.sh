@@ -41,6 +41,20 @@ TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
 
 #------------------------------
+wait_for_process() {
+  pid=$1
+  name=$2
+  num_processes=$(ps | grep "$pid.*$name" | grep -v grep | wc -l)
+  echo $num_processes
+  while [ "$num_processes" -ge "1" ]; do
+    $SLEEP 1
+    which_processes=$(ps | grep "$pid.*$name" | grep -v grep)
+    echo $which_processes > /dev/tty
+    num_processes=$(ps | grep "$pid.*$name" | grep -v grep | wc -l)
+    echo $num_processes
+  done
+}
+
 
 # These apps we can use the window name to get the front tab
 # And use that to define the 'focus'
@@ -94,7 +108,7 @@ output() {
 }
 
 log() {
-  output "$1"
+  echo "$1" > /dev/tty
 }
 log "LOG START"
 
@@ -130,6 +144,7 @@ update_scores() {
       MAX_SCORE=$this_score
       MAX_APP=$1
     fi
+    log "update_scores: $1 time:$time score:$this_score tot_score:$TOT_SCORE idle:$idle last_idle:$LAST_IDLE tot_idle:$TOT_IDLE num_switches:$NUM_SWITCHES"
     LAST_IDLE=$idle
     LAST_TIME=$time
   fi
@@ -140,11 +155,14 @@ report() {
   work_begin_ts="$2"
   work_end=$($GDATE $MS_PATTERN)
   word_end_ts=$($GDATE $TIMESTAMP_PATTERN)
-  
-  kill $IDLE_PID 2> /dev/null
+ 
+  log "killing idle process at $IDLE_PID"
+  rm -f /tmp/total_idle_time
+  wait_for_process $IDLE_PID 'idle'
+  log "idle killed"
 
-  # rm -f  $OUTPUT_FILE
-  # touch $OUTPUT_FILE
+  rm -f  $OUTPUT_FILE
+  touch $OUTPUT_FILE
 
   session_length_secs=$(echo "($work_end - $work_begin) / 1000" | bc)
   output ""
@@ -185,11 +203,15 @@ report() {
     fi
   fi
   echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> $LOG_FILE
+  echo "report done" > /dev/tty
   exit 0
 }
 
 
 track_focus() {
+  echo "TRACK FOCUS" > /dev/tty
+  rm -f /tmp/total_idle_time
+  
   # Spawn idle time tracker
   $IDLE 10 &
   IDLE_PID=$!
@@ -197,16 +219,22 @@ track_focus() {
   work_begin=$($GDATE $MS_PATTERN)
   work_begin_ts=$($GDATE $TIMESTAMP_PATTERN)
   LAST_TIME=$work_begin
+  while [[ ! -f /tmp/total_idle_time ]] ; do
+    echo "IDLE STARTING" > /dev/tty
+    $SLEEP 0.1
+  done
+  LAST_IDLE=$(cat /tmp/total_idle_time)
+  echo "STARTING IDLE: $LAST_IDLE" > /dev/tty
 
   lastfocus=$($GET_FOCUS)
   output "Work session started at $work_begin_ts -- $work_begin -- $lastfocus"
 
+  echo "START" > /dev/tty
   # loop forever, sleep for 1 second
   while [[ -f $PID_FILE ]] ; do
       $SLEEP 0.1
       # get the focused app
       focus=$($GET_FOCUS)
-      log "FOCUS -- $focus"
       # if the focused app is not the same as the last focused app
       if [ "$focus" != "$lastfocus" ]; then
           log "FOCUS SWITCH $lastfocus -> $focus"
@@ -221,17 +249,10 @@ track_focus() {
           lastfocus=$focus
       fi
   done
+  echo "DONE" > /dev/tty
   focus=$($GET_FOCUS)
   update_scores "$lastfocus"
   report "$work_begin" "$work_begin_ts"
-}
-
-wait_for_process() {
-  num_processes=$(ps | grep "$pid.*focus" | grep -v grep | wc -l)
-  while [ "$num_processes" -ge "1" ]; do
-    $SLEEP 1
-    num_processes=$(ps | grep "$pid.*focus" | grep -v grep | wc -l)
-  done
 }
 
 # On Ctrl+C, print the score and exit
@@ -242,7 +263,9 @@ if [[ "$1" == "start" ]]; then
     exit 1
   fi
   touch $PID_FILE
+  echo "STARTING..."
   track_focus & 
+  echo "...FORKED"
   pid=$!
   echo "$pid" > $PID_FILE
 elif [[ "$1" == "stop" ]]; then
@@ -250,7 +273,7 @@ elif [[ "$1" == "stop" ]]; then
     pid=$(cat $PID_FILE)
     echo "Stopping focus at pid $pid"
     rm $PID_FILE
-    wait_for_process $pid
+    wait_for_process "$pid" 'focus'
     echo "Process stopped"
     cat $OUTPUT_FILE
   else

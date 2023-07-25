@@ -64,6 +64,8 @@ default_returns() {
   on_any_call 'echo "Terminal"' focus_mock
   on_any_call ' if [[ "$1" == "+%s%3N" ]]; then echo "1000"; fi' gdate_mock
   on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
+  
+  resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
 }
 
 single_focus_at_length() {
@@ -80,6 +82,8 @@ single_focus_at_length() {
   resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
   resp_on_call_count 2 'echo "Terminal"' focus_mock
   resp_on_call_count_gte 3 'echo "Youdontwannaknow"' focus_mock
+  
+  resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
 }
 
 
@@ -127,7 +131,7 @@ test_focus_produces_output() {
   default_returns
 
   ./focus.sh start
-  sleep 0.1
+  sleep 1
   ./focus.sh stop
   if [[ -f $OUTPUT_FILE ]]; then
     return 0
@@ -139,7 +143,7 @@ test_focus_produces_output() {
 test_focus_long_focus_scores_near_actual_time() {
   single_focus_at_length 3000
   ./focus.sh start
-  sleep 0.1
+  sleep 1
   ./focus.sh stop
   max_score=$(get_stat "Max focus score")
   check_gt $max_score 2900
