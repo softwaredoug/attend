@@ -3,6 +3,7 @@
 OUTPUT_FILE="/tmp/focus_output.txt"
 PID_FILE="/tmp/focus_process.pid"
 LOG_FILE="/tmp/focus_log.txt"
+IDLE_TIME_FILE="/tmp/total_idle_time"
 
 mock() {
   cp test/command_mock.sh $1_mock
@@ -32,6 +33,7 @@ fixtures() {
   for mock in ${MOCKS[@]}; do
     mock $mock
   done
+  echo "0" > $IDLE_TIME_FILE
 }
 
 resp_on_call_count() {
