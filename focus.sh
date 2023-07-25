@@ -221,18 +221,10 @@ track_focus() {
 
 wait_for_process() {
   num_processes=$(ps | grep "$pid.*focus" | grep -v grep | wc -l)
-  process_found
-  echo "NUM PROCESSES - $num_processes"
-
-  ps | grep "$pid.*focus"  | grep -v grep
   while [ "$num_processes" -ge "1" ]; do
     $SLEEP 1
-    ps | grep "$pid.*focus"  | grep -v grep
     num_processes=$(ps | grep "$pid.*focus" | grep -v grep | wc -l)
-    echo "NUM PROCESSES - $num_processes"
   done
-  echo "Done"
-  ps | grep "$pid.*focus"  | grep -v grep
 }
 
 # On Ctrl+C, print the score and exit
