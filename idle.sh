@@ -2,13 +2,14 @@
 
 # Start tracking total user idle time to a file
 # Only counting any idle periods > $1
+. log.sh
 
-echo "START BILLY IDLE" > /dev/tty
+log "START BILLY IDLE"
 
 total_idle=0
 echo "$total_idle" > /tmp/total_idle_time
-echo "IDLE FILE INIT:" > /dev/tty
-echo $(cat /tmp/total_idle_time) > /dev/tty
+log "IDLE FILE INIT:"
+log $(cat /tmp/total_idle_time)
 
 check_frequency="$1"
 while [[ -f /tmp/total_idle_time ]] ; do
@@ -21,6 +22,6 @@ while [[ -f /tmp/total_idle_time ]] ; do
     echo $total_idle > /tmp/total_idle_time
   fi
 
-  echo "idle -> $total_idle" > /dev/tty
+  log "idle -> $total_idle"
   sleep $check_frequency
 done

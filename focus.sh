@@ -45,13 +45,10 @@ wait_for_process() {
   pid=$1
   name=$2
   num_processes=$(ps | grep "$pid.*$name" | grep -v grep | wc -l)
-  echo $num_processes
   while [ "$num_processes" -ge "1" ]; do
     $SLEEP 1
     which_processes=$(ps | grep "$pid.*$name" | grep -v grep)
-    echo $which_processes > /dev/tty
     num_processes=$(ps | grep "$pid.*$name" | grep -v grep | wc -l)
-    echo $num_processes
   done
 }
 
@@ -107,9 +104,7 @@ output() {
   echo "$1" >> $OUTPUT_FILE
 }
 
-log() {
-  echo "$1" > /dev/tty
-}
+. log.sh
 log "LOG START"
 
 scoring_function() {
@@ -203,13 +198,13 @@ report() {
     fi
   fi
   echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> $LOG_FILE
-  echo "report done" > /dev/tty
+  log "REPORT DONE... quitting"
   exit 0
 }
 
 
 track_focus() {
-  echo "TRACK FOCUS" > /dev/tty
+  log "TRACK FOCUS STARTING"
   rm -f /tmp/total_idle_time
   
   # Spawn idle time tracker
@@ -220,16 +215,15 @@ track_focus() {
   work_begin_ts=$($GDATE $TIMESTAMP_PATTERN)
   LAST_TIME=$work_begin
   while [[ ! -f /tmp/total_idle_time ]] ; do
-    echo "IDLE STARTING" > /dev/tty
+    log "WAITING ON IDLE"
     $SLEEP 0.1
   done
   LAST_IDLE=$(cat /tmp/total_idle_time)
-  echo "STARTING IDLE: $LAST_IDLE" > /dev/tty
+  log "IDLE READY! $LAST_IDLE"
 
   lastfocus=$($GET_FOCUS)
-  output "Work session started at $work_begin_ts -- $work_begin -- $lastfocus"
+  log "Work session started at $work_begin_ts -- $work_begin -- $lastfocus"
 
-  echo "START" > /dev/tty
   # loop forever, sleep for 1 second
   while [[ -f $PID_FILE ]] ; do
       $SLEEP 0.1
@@ -249,7 +243,7 @@ track_focus() {
           lastfocus=$focus
       fi
   done
-  echo "DONE" > /dev/tty
+  log "track_focus main loop DONE"
   focus=$($GET_FOCUS)
   update_scores "$lastfocus"
   report "$work_begin" "$work_begin_ts"
@@ -263,9 +257,7 @@ if [[ "$1" == "start" ]]; then
     exit 1
   fi
   touch $PID_FILE
-  echo "STARTING..."
   track_focus & 
-  echo "...FORKED"
   pid=$!
   echo "$pid" > $PID_FILE
 elif [[ "$1" == "stop" ]]; then
