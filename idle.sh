@@ -4,24 +4,29 @@
 # Only counting any idle periods > $1
 . log.sh
 
+IDLE_TIME_FILE="/tmp/total_idle_time"
+
 log "START BILLY IDLE"
 
 total_idle=0
-echo "$total_idle" > /tmp/total_idle_time
+echo "$total_idle" > $IDLE_TIME_FILE
 log "IDLE FILE INIT:"
-log $(cat /tmp/total_idle_time)
+log $(cat $IDLE_TIME_FILE)
 
 check_frequency="$1"
-while [[ -f /tmp/total_idle_time ]] ; do
+while [[ -f $IDLE_TIME_FILE ]] ; do
   idle=$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}')
   # Accumulate idle if more than sleep period
   if [ $(echo "$idle > $check_frequency" | bc) -eq 1 ]; then
     total_idle=$(echo "$total_idle + $idle" | bc)
   fi
-  if [[ -f /tmp/total_idle_time ]]; then
-    echo $total_idle > /tmp/total_idle_time
+  if [[ -f $IDLE_TIME_FILE ]]; then
+    echo $total_idle > $IDLE_TIME_FILE
   fi
 
   log "idle -> $total_idle"
   sleep $check_frequency
+  echo $num_processes
 done
+
+log "END BILLY IDLE"

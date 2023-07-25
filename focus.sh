@@ -39,6 +39,7 @@ fi
 
 TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
+IDLE_TIME_FILE="/tmp/total_idle_time"
 
 #------------------------------
 wait_for_process() {
@@ -124,7 +125,7 @@ scoring_function() {
 update_scores() {
   time=$($GDATE $MS_PATTERN )
   # calculate the time spent on the last focused app
-  idle=$(cat /tmp/total_idle_time)
+  idle=$(cat $IDLE_TIME_FILE)
   this_idle=$(echo "$idle - $LAST_IDLE" | bc)
   let "time_diff = $time - $LAST_TIME"
   if [ "$time_diff" -gt "0" ]; then
@@ -152,7 +153,7 @@ report() {
   word_end_ts=$($GDATE $TIMESTAMP_PATTERN)
  
   log "killing idle process at $IDLE_PID"
-  rm -f /tmp/total_idle_time
+  rm -f $IDLE_TIME_FILE
   wait_for_process $IDLE_PID 'idle'
   log "idle killed"
 
@@ -205,7 +206,7 @@ report() {
 
 track_focus() {
   log "TRACK FOCUS STARTING"
-  rm -f /tmp/total_idle_time
+  rm -f $IDLE_TIME_FILE
   
   # Spawn idle time tracker
   $IDLE 10 &
@@ -214,11 +215,11 @@ track_focus() {
   work_begin=$($GDATE $MS_PATTERN)
   work_begin_ts=$($GDATE $TIMESTAMP_PATTERN)
   LAST_TIME=$work_begin
-  while [[ ! -f /tmp/total_idle_time ]] ; do
+  while [[ ! -f $IDLE_TIME_FILE ]] ; do
     log "WAITING ON IDLE"
     $SLEEP 0.1
   done
-  LAST_IDLE=$(cat /tmp/total_idle_time)
+  LAST_IDLE=$(cat $IDLE_TIME_FILE)
   log "IDLE READY! $LAST_IDLE"
 
   lastfocus=$($GET_FOCUS)
