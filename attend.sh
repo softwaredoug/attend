@@ -35,8 +35,8 @@ if [[ -f 'idle_mock' ]]; then
   GDATE="./gdate_mock"
 else
   LOG_FILE="$HOME/.attend_log.txt"
+  OUTPUT_FILE="$HOME/.attend_worklog.txt"
   PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_process.pid)
-  OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_output.txt)
 fi
 
 TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
@@ -101,10 +101,15 @@ LAST_TIME=0
 LAST_IDLE=0
 TOT_IDLE=0
 IDLE_PID=0
+NUM_LINES=0
 MAX_APP=""
 
 output() {
+  if [[ ! -f $OUTPUT_FILE ]]; then
+    touch $OUTPUT_FILE
+  fi
   echo "$1" >> $OUTPUT_FILE
+  let "NUM_LINES = $NUM_LINES + 1"  
 }
 
 . "$SCRIPT_DIR"/log.sh
@@ -162,9 +167,6 @@ report() {
   wait_for_process $IDLE_PID 'idle'
   log "idle killed"
 
-  rm -f  $OUTPUT_FILE
-  touch $OUTPUT_FILE
-
   session_length_secs=$(echo "($work_end - $work_begin) / 1000" | bc)
   output ""
   output "Work session done:"
@@ -215,6 +217,9 @@ report() {
     touch $LOG_FILE
   fi
   echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE" >> $LOG_FILE
+  tail -n $NUM_LINES $OUTPUT_FILE
+  echo "View full work log at $OUTPUT_FILE"
+  echo "Reset with rm $OUTPUT_FILE"
   log "REPORT DONE... quitting"
   exit 0
 }
@@ -289,7 +294,6 @@ elif [[ "$1" == "stop" ]]; then
     rm $PID_FILE
     wait_for_process "$pid" $PROCESS_NAME
     echo "Process stopped"
-    cat $OUTPUT_FILE
   else
     echo "No attend process running"
     exit 1

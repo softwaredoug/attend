@@ -158,6 +158,24 @@ test_attend_produces_output() {
   fi
 }
 
+test_attend_keeps_output() {
+  default_returns
+
+  ./attend.sh start
+  sleep 1
+  ./attend.sh stop
+  wc_first=$(cat $OUTPUT_FILE | wc -l)
+  ./attend.sh start
+  sleep 1
+  ./attend.sh stop
+  wc_second=$(cat $OUTPUT_FILE | wc -l)
+  if [[ $wc_first -lt $wc_second ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 test_attend_long_focus_scores_near_actual_time() {
   single_focus_at_length 3000
   ./attend.sh start
