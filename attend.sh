@@ -211,6 +211,9 @@ report() {
     $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
   log "Append to log file -- $LOG_FILE"
+  if [[ ! -f $LOG_FILE ]]; then
+    touch $LOG_FILE
+  fi
   echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE" >> $LOG_FILE
   log "REPORT DONE... quitting"
   exit 0
