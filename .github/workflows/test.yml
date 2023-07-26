@@ -13,4 +13,4 @@ jobs:
 
       - name: Run Bash tests
         run: |
-          bash ./test/test_focus.sh
+          bash ./test/test_attend.sh
