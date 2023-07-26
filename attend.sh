@@ -14,6 +14,8 @@ afplay_call() {
   afplay "$@" &
 }
 
+PROCESS_NAME="attend"
+
 GET_FOCUS=focus_call
 SLEEP=sleep
 AFPLAY=afplay_call
@@ -25,7 +27,6 @@ if [[ -f 'idle_mock' ]]; then
   OUTPUT_FILE="/tmp/focus_output.txt"
   PID_FILE="/tmp/focus_process.pid"
 
-  TEST_MODE=1
   IDLE='./idle_mock'
   GET_FOCUS="./focus_mock"
   SLEEP="./sleep_mock"
@@ -106,6 +107,7 @@ output() {
 }
 
 . log.sh
+
 log "LOG START"
 
 scoring_function() {
@@ -127,6 +129,7 @@ update_scores() {
   # calculate the time spent on the last focused app
   idle=$(cat $IDLE_TIME_FILE)
   this_idle=$(echo "$idle - $LAST_IDLE" | bc)
+  log "LAST_TIME:$LAST_TIME time:$time idle:$idle this_idle:$this_idle"
   let "time_diff = $time - $LAST_TIME"
   if [ "$time_diff" -gt "0" ]; then
     time_no_idle=$(echo "$time_diff - $this_idle" | bc)
@@ -276,7 +279,7 @@ elif [[ "$1" == "stop" ]]; then
     pid=$(cat $PID_FILE)
     echo "Stopping focus at pid $pid"
     rm $PID_FILE
-    wait_for_process "$pid" 'focus'
+    wait_for_process "$pid" $PROCESS_NAME
     echo "Process stopped"
     cat $OUTPUT_FILE
   else

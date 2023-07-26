@@ -7,7 +7,6 @@ IDLE_TIME_FILE="/tmp/total_idle_time"
 
 mock() {
   cp test/command_mock.sh $1_mock
-  rm -f ".last_$1_mock"_args
 }
 
 clean_mock() {
@@ -17,6 +16,7 @@ clean_mock() {
 }
 
 clean_fixtures() {
+  echo "CLEANING UP FIXTURES"
   for mock in ${MOCKS[@]}; do
     clean_mock $mock
   done
@@ -89,15 +89,16 @@ single_focus_at_length() {
 two_apps_focused_at_length() {
   focus_ms=$(echo "$1 * 1000" | bc)
   begin_focus=1000
-  end_focus=$(echo "$focus_ms + $begin_focus" | bc)
-  end_focus2=$(echo "$end_focus + $focus_ms" | bc)
-  end_run=$(echo "$end_focus + 1001" | bc)
+  end_focus=$(echo "$begin_focus + $focus_ms" | bc)
+  end_focus2=$(echo "$begin_focus + (2 * $focus_ms)" | bc)
+  end_run=$(echo "$end_focus2 + 1001" | bc)
+
   resp_on_call_count 1 'if [[ "$1" == "+%s%3N" ]]; then echo "'$begin_focus'"; fi' gdate_mock
   resp_on_call_count 2 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus'"; fi' gdate_mock
   resp_on_call_count 3 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus2'"; fi' gdate_mock
   resp_on_call_count 4 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
   on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
-  resp_on_call_count_gte 4 ' if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
+  resp_on_call_count_gte 5 ' if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
 
   resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
   resp_on_call_count 2 'echo "Terminal"' focus_mock
@@ -145,12 +146,12 @@ check_lt() {
 }
 
 
-test_focus_produces_output() {
+test_attend_produces_output() {
   default_returns
 
-  ./focus.sh start
+  ./attend.sh start
   sleep 1
-  ./focus.sh stop
+  ./attend.sh stop
   if [[ -f $OUTPUT_FILE ]]; then
     return 0
   else
@@ -158,11 +159,11 @@ test_focus_produces_output() {
   fi
 }
 
-test_focus_long_focus_scores_near_actual_time() {
+test_attend_long_focus_scores_near_actual_time() {
   single_focus_at_length 3000
-  ./focus.sh start
+  ./attend.sh start
   sleep 1
-  ./focus.sh stop
+  ./attend.sh stop
   max_score=$(get_stat "Max focus score")
   check_gt $max_score 2900
   if [[ $? -ne 0 ]]; then
@@ -176,12 +177,12 @@ test_focus_long_focus_scores_near_actual_time() {
   fi
 }
 
-test_focus_two_long_focus_scores_near_actual_time() {
+test_attend_two_long_focus_scores_near_actual_time() {
   two_apps_focused_at_length 3000
   expected_score=6000
-  ./focus.sh start
+  ./attend.sh start
   sleep 1
-  ./focus.sh stop
+  ./attend.sh stop
   max_score=$(get_stat "Max focus score")
   check_gt $max_score $(echo "$expected_score - 100" | bc)
   if [[ $? -ne 0 ]]; then
@@ -195,11 +196,11 @@ test_focus_two_long_focus_scores_near_actual_time() {
   fi
 }
 
-test_focus_tracks_longest_app() {
+test_attend_tracks_longest_app() {
   single_focus_at_length 3000
-  ./focus.sh start
+  ./attend.sh start
   sleep 1
-  ./focus.sh stop
+  ./attend.sh stop
   longest_app=$(get_stat "Most focused app")
   echo "longest_app: $longest_app"
   if [[ $longest_app != "Google Chrome || https://www.google.com/" ]]; then
@@ -207,10 +208,10 @@ test_focus_tracks_longest_app() {
   fi
 }
 
-test_focus_short_focus_scores_a_lot_less_than_time() {
+test_attend_short_focus_scores_a_lot_less_than_time() {
   single_focus_at_length 1
-  ./focus.sh start
-  ./focus.sh stop
+  ./attend.sh start
+  ./attend.sh stop
   max_score=$(get_stat "Max focus score")
   check_lt "$max_score" "1"
   if [[ $? -ne 0 ]]; then
@@ -218,10 +219,10 @@ test_focus_short_focus_scores_a_lot_less_than_time() {
   fi
 }
 
-test_focus_output_missing_log() {
+test_attend_output_missing_log() {
   single_focus_at_length 3000
-  ./focus.sh start
-  ./focus.sh stop
+  ./attend.sh start
+  ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "LOG START"
   success=$?
   if [[ $success -eq 0 ]]; then
@@ -231,8 +232,8 @@ test_focus_output_missing_log() {
 
 test_detects_new_high_score_on_empty_log() {
   single_focus_at_length 3000
-  ./focus.sh start
-  ./focus.sh stop
+  ./attend.sh start
+  ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "New high max score"
   return $?
 }
@@ -240,9 +241,10 @@ test_detects_new_high_score_on_empty_log() {
 test_detects_new_high_score() {
   # last two values avg, max
   echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  cat $LOG_FILE
   single_focus_at_length 3000
-  ./focus.sh start
-  ./focus.sh stop
+  ./attend.sh start
+  ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "New high max score"
   return $?
 }
@@ -251,8 +253,8 @@ test_appends_to_existing_log() {
   # last two values avg, max
   echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
   single_focus_at_length 3000
-  ./focus.sh start
-  ./focus.sh stop
+  ./attend.sh start
+  ./attend.sh stop
   wc -l $LOG_FILE | grep -q "2"
   return $?
 }
@@ -262,8 +264,8 @@ test_doesnt_detect_high_if_not_higher() {
   echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
   cat $LOG_FILE
   single_focus_at_length 1
-  ./focus.sh start
-  ./focus.sh stop
+  ./attend.sh start
+  ./attend.sh stop
   cat $OUTPUT_FILE | grep -vq "New high max score"
   if [[ $? -ne 0 ]]; then
     return 1
