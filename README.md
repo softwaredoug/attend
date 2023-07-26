@@ -20,7 +20,17 @@ Work session done!
    the more time you spend on a task, the more the seconds accumulate!...
 ----------------------------------------
 You started working at 2023-07-25T16:49:04
-Work session length: 25 seconds
+Work session length: 15120 seconds
+----
+Average focus score: 1500.49887665797257113314
+Max focus score: 3000.99775331594514226628
+Most focused app: Google Chrome || https://docs.google.com
+Num task switches: 45
+Total idle time: 12
+----
+🎉🎉🎉🎉🎉🎉🎉🎉🎉
+New high max score! -- 3000.99775331594514226628
+```
 
 ## Install
 
