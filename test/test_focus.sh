@@ -86,6 +86,26 @@ single_focus_at_length() {
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
 }
 
+two_apps_focused_at_length() {
+  focus_ms=$(echo "$1 * 1000" | bc)
+  begin_focus=1000
+  end_focus=$(echo "$focus_ms + $begin_focus" | bc)
+  end_focus2=$(echo "$end_focus + $focus_ms" | bc)
+  end_run=$(echo "$end_focus + 1001" | bc)
+  resp_on_call_count 1 'if [[ "$1" == "+%s%3N" ]]; then echo "'$begin_focus'"; fi' gdate_mock
+  resp_on_call_count 2 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus'"; fi' gdate_mock
+  resp_on_call_count 3 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus2'"; fi' gdate_mock
+  resp_on_call_count 4 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
+  on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
+  resp_on_call_count_gte 4 ' if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
+
+  resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 2 'echo "Terminal"' focus_mock
+  resp_on_call_count_gte 3 'echo "Youdontwannaknow"' focus_mock
+  
+  resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
+}
+
 
 get_stat() {
   stat=$1
@@ -150,6 +170,25 @@ test_focus_long_focus_scores_near_actual_time() {
     return 1
   fi
   check_lt $max_score 3100
+  if [[ $? -ne 0 ]]; then
+    echo "lt max_score: $max_score < 3100"
+    return 1
+  fi
+}
+
+test_focus_two_long_focus_scores_near_actual_time() {
+  two_apps_focused_at_length 3000
+  expected_score=6000
+  ./focus.sh start
+  sleep 1
+  ./focus.sh stop
+  max_score=$(get_stat "Max focus score")
+  check_gt $max_score $(echo "$expected_score - 100" | bc)
+  if [[ $? -ne 0 ]]; then
+    echo "gt max_score: $max_score > 2900"
+    return 1
+  fi
+  check_lt $max_score $(echo "$expected_score + 100" | bc)
   if [[ $? -ne 0 ]]; then
     echo "lt max_score: $max_score < 3100"
     return 1
