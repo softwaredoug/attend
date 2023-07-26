@@ -153,6 +153,7 @@ update_scores() {
 report() {
   work_begin="$1"
   work_begin_ts="$2"
+  session_name="$3"
   work_end=$($GDATE $MS_PATTERN)
   word_end_ts=$($GDATE $TIMESTAMP_PATTERN)
  
@@ -166,7 +167,8 @@ report() {
 
   session_length_secs=$(echo "($work_end - $work_begin) / 1000" | bc)
   output ""
-  output "Work session done!"
+  output "Work session done:"
+  output "  $session_name"
   output "----------------------------------------"
   output "...All scores in effective seconds..."
   output "   the more time you spend on a task, the more the seconds accumulate!..."
@@ -213,6 +215,7 @@ report() {
 
 
 track_focus() {
+  session_name="$1"
   log "TRACK FOCUS STARTING"
   rm -f $IDLE_TIME_FILE
   
@@ -255,7 +258,7 @@ track_focus() {
   log "track_focus main loop DONE"
   focus=$($GET_FOCUS)
   update_scores "$lastfocus"
-  report "$work_begin" "$work_begin_ts"
+  report "$work_begin" "$work_begin_ts" "$session_name"
 }
 
 # On Ctrl+C, print the score and exit
@@ -266,7 +269,7 @@ if [[ "$1" == "start" ]]; then
     exit 1
   fi
   touch $PID_FILE
-  track_focus & 
+  track_focus "$2" & 
   pid=$!
   echo "$pid" > $PID_FILE
   while [[ ! -f $IDLE_TIME_FILE ]] ; do
