@@ -254,8 +254,6 @@ test_appends_to_existing_log() {
   single_focus_at_length 3000
   ./attend.sh start
   ./attend.sh stop
-  echo $LOG_FILE
-  cat $LOG_FILE 
   wc -l $LOG_FILE | grep -q "2"
   return $?
 }
