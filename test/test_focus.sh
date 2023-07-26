@@ -171,7 +171,6 @@ test_focus_tracks_longest_app() {
 test_focus_short_focus_scores_a_lot_less_than_time() {
   single_focus_at_length 1
   ./focus.sh start
-  sleep 1
   ./focus.sh stop
   max_score=$(get_stat "Max focus score")
   check_lt "$max_score" "1"
@@ -183,7 +182,6 @@ test_focus_short_focus_scores_a_lot_less_than_time() {
 test_focus_output_missing_log() {
   single_focus_at_length 3000
   ./focus.sh start
-  sleep 1
   ./focus.sh stop
   cat $OUTPUT_FILE | grep -q "LOG START"
   success=$?
@@ -198,7 +196,6 @@ test_detects_new_high_score() {
   cat $LOG_FILE
   single_focus_at_length 3000
   ./focus.sh start
-  sleep 1
   ./focus.sh stop
   cat $OUTPUT_FILE | grep -q "New high max score"
   if [[ $? -ne 0 ]]; then
@@ -212,7 +209,6 @@ test_appends_to_existing_log() {
   cat $LOG_FILE
   single_focus_at_length 3000
   ./focus.sh start
-  sleep 1
   ./focus.sh stop
   wc -l $LOG_FILE | grep -q "2"
   return $?
@@ -224,7 +220,6 @@ test_doesnt_detect_high_if_not_higher() {
   cat $LOG_FILE
   single_focus_at_length 1
   ./focus.sh start
-  sleep 1
   ./focus.sh stop
   cat $OUTPUT_FILE | grep -vq "New high max score"
   if [[ $? -ne 0 ]]; then

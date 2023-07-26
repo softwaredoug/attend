@@ -220,7 +220,7 @@ track_focus() {
   work_begin_ts=$($GDATE $TIMESTAMP_PATTERN)
   LAST_TIME=$work_begin
   while [[ ! -f $IDLE_TIME_FILE ]] ; do
-    log "WAITING ON IDLE"
+    log "WAITING ON IDLE (child)"
     $SLEEP 0.1
   done
   LAST_IDLE=$(cat $IDLE_TIME_FILE)
@@ -265,6 +265,11 @@ if [[ "$1" == "start" ]]; then
   track_focus & 
   pid=$!
   echo "$pid" > $PID_FILE
+  while [[ ! -f $IDLE_TIME_FILE ]] ; do
+    echo "Waiting on focus to start..."
+    $SLEEP 0.1
+  done
+  echo "Started!"
 elif [[ "$1" == "stop" ]]; then
   if [[ -f $PID_FILE ]]; then
     pid=$(cat $PID_FILE)
