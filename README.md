@@ -38,10 +38,3 @@ New high max score! -- 3000.99775331594514226628
 brew tap softwaredoug/attend
 brew install attend
 ```
-----
-Average focus score: 1.36846972804751812470
-Max focus score: 3.61841740796953469424
-Most focused app: Terminal
-Num task switches: 5
-Total idle time: 0
-```
