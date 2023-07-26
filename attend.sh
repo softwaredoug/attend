@@ -270,22 +270,24 @@ if [[ "$1" == "start" ]]; then
   pid=$!
   echo "$pid" > $PID_FILE
   while [[ ! -f $IDLE_TIME_FILE ]] ; do
-    echo "Waiting on focus to start..."
+    echo "Waiting on attend to start..."
     $SLEEP 0.1
   done
 elif [[ "$1" == "stop" ]]; then
   if [[ -f $PID_FILE ]]; then
     pid=$(cat $PID_FILE)
-    echo "Stopping focus at pid $pid"
+    echo "Stopping attend at pid $pid"
     rm $PID_FILE
     wait_for_process "$pid" $PROCESS_NAME
     echo "Process stopped"
     cat $OUTPUT_FILE
   else
-    echo "No focus process running"
+    echo "No attend process running"
     exit 1
   fi
 else
-  echo "Usage: focus [start|stop]"
+  echo "Usage: attend [start|stop]"
+  echo "  start: start tracking your focus"
+  echo "  stop: stop your work session"
   exit 1
 fi
