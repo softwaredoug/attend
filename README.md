@@ -8,14 +8,16 @@ More time in one app == higher score.
 (also plays a bell anytime you switch your OSX task to remind you)
 
 ```
-attend start
+attend start "Review the document"
 ```
 
 Work work work... sometime later
 
 ```
 attend stop
+
 Work session done!
+   Review the document
 ----------------------------------------
 ...All scores in effective seconds...
    the more time you spend on a task, the more the seconds accumulate!...
