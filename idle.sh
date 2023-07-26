@@ -1,8 +1,9 @@
 #!/bin/bash
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Start tracking total user idle time to a file
 # Only counting any idle periods > $1
-. log.sh
+. "$SCRIPT_DIR"/log.sh
 
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
