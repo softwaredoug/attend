@@ -13,7 +13,7 @@ focus_call() {
 }
 
 afplay_call() {
-  "$SCRIPT_DIR"/afplay "$@" &
+  afplay "$@" &
 }
 
 
