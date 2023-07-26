@@ -169,8 +169,8 @@ report() {
   output "----------------------------------------"
   # Write date and score to ~/.focus_scores
   # Check the highest score
-  highest_avg=$(sort -k8 -n -r ~/.focus_scores 2> /dev/null | head -n 1 | awk '{print $8}')
-  highest_max=$(sort -k9 -n -r ~/.focus_scores 2> /dev/null | head -n 1 | awk '{print $9}')
+  highest_avg=$(sort -k7 -n -r $LOG_FILE 2> /dev/null | head -n 1 | awk '{print $7}')
+  highest_max=$(sort -k8 -n -r $LOG_FILE 2> /dev/null | head -n 1 | awk '{print $8}')
   # If the current score is higher than the highest score
 
   avg_score=$(echo "$TOT_SCORE / $NUM_SWITCHES" | bc -l)
@@ -187,8 +187,8 @@ report() {
   output "Highest average score: $highest_avg"
   output "Highest     max score: $highest_max"
 
-  if [ ! -f ~/.focus_scores ]; then
-    touch ~/.focus_scores
+  if [ ! -f $LOG_FILE ]; then
+    touch $LOG_FILE
   else
     if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
       output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
@@ -202,7 +202,7 @@ report() {
       $AFPLAY ./tada.mp3
     fi
   fi
-  echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE " >> $LOG_FILE
+  echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE" >> $LOG_FILE
   log "REPORT DONE... quitting"
   exit 0
 }

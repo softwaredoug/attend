@@ -117,8 +117,6 @@ check_gt() {
 check_lt() {
   first=$(clean_number "$1")
   second=$(clean_number "$2")
-  echo "first: $first"
-  echo "second: $second"
   if [[ $(echo "$first < $second" |bc -l) == 1 ]]; then
     return 0
   else
@@ -190,6 +188,46 @@ test_focus_output_missing_log() {
   cat $OUTPUT_FILE | grep -q "LOG START"
   success=$?
   if [[ $success -eq 0 ]]; then
+    return 1
+  fi
+}
+
+test_detects_new_high_score() {
+  # last two values avg, max
+  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  cat $LOG_FILE
+  single_focus_at_length 3000
+  ./focus.sh start
+  sleep 1
+  ./focus.sh stop
+  cat $OUTPUT_FILE | grep -q "New high max score"
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
+}
+
+test_appends_to_existing_log() {
+  # last two values avg, max
+  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  cat $LOG_FILE
+  single_focus_at_length 3000
+  ./focus.sh start
+  sleep 1
+  ./focus.sh stop
+  wc -l $LOG_FILE | grep -q "2"
+  return $?
+}
+
+test_doesnt_detect_high_if_not_higher() {
+  # last two values avg, max
+  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  cat $LOG_FILE
+  single_focus_at_length 1
+  ./focus.sh start
+  sleep 1
+  ./focus.sh stop
+  cat $OUTPUT_FILE | grep -vq "New high max score"
+  if [[ $? -ne 0 ]]; then
     return 1
   fi
 }
