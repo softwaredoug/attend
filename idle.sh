@@ -27,7 +27,6 @@ while [[ -f $IDLE_TIME_FILE ]] ; do
 
   log "idle -> $total_idle"
   sleep $check_frequency
-  echo $num_processes
 done
 
 log "END BILLY IDLE"

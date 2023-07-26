@@ -34,7 +34,7 @@ if [[ -f 'idle_mock' ]]; then
   AFPLAY="./afplay_mock"
   GDATE="./gdate_mock"
 else
-  LOG_FILE='~/.attend_log.txt'
+  LOG_FILE="$HOME/.attend_log.txt"
   PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_process.pid)
   OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_output.txt)
 fi
