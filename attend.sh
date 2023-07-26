@@ -23,9 +23,9 @@ GDATE=gdate
 IDLE=idle_call
 
 if [[ -f 'idle_mock' ]]; then
-  LOG_FILE="/tmp/focus_log.txt"
-  OUTPUT_FILE="/tmp/focus_output.txt"
-  PID_FILE="/tmp/focus_process.pid"
+  LOG_FILE="/tmp/attend_log.txt"
+  OUTPUT_FILE="/tmp/attend_output.txt"
+  PID_FILE="/tmp/attend_process.pid"
 
   IDLE='./idle_mock'
   GET_FOCUS="./focus_mock"
@@ -33,9 +33,9 @@ if [[ -f 'idle_mock' ]]; then
   AFPLAY="./afplay_mock"
   GDATE="./gdate_mock"
 else
-  LOG_FILE='./focus_log.txt'
-  PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_process.pid)
-  OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/focus_output.txt)
+  LOG_FILE='~/.attend_log.txt'
+  PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_process.pid)
+  OUTPUT_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_output.txt)
 fi
 
 TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
@@ -170,7 +170,6 @@ report() {
   output "...All scores in effective seconds..."
   output "   the more time you spend on a task, the more the seconds accumulate!..."
   output "----------------------------------------"
-  # Write date and score to ~/.focus_scores
   # Check the highest score
   highest_avg=$(sort -k7 -n -r $LOG_FILE 2> /dev/null | head -n 1 | awk '{print $7}')
   highest_max=$(sort -k8 -n -r $LOG_FILE 2> /dev/null | head -n 1 | awk '{print $8}')
@@ -273,7 +272,6 @@ if [[ "$1" == "start" ]]; then
     echo "Waiting on focus to start..."
     $SLEEP 0.1
   done
-  echo "Started!"
 elif [[ "$1" == "stop" ]]; then
   if [[ -f $PID_FILE ]]; then
     pid=$(cat $PID_FILE)
