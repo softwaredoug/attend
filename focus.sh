@@ -189,18 +189,19 @@ report() {
 
   if [ ! -f $LOG_FILE ]; then
     touch $LOG_FILE
-  else
-    if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
-      output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-      output "New high average score! -- $avg_score"
-      $AFPLAY ./tada.mp3
-    fi
-    
-    if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
-      output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-      output "New high max score! -- $MAX_SCORE"
-      $AFPLAY ./tada.mp3
-    fi
+    highest_avg=0
+    highest_max=0
+  fi
+  if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
+    output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+    output "New high average score! -- $avg_score"
+    $AFPLAY ./tada.mp3
+  fi
+  
+  if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
+    output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+    output "New high max score! -- $MAX_SCORE"
+    $AFPLAY ./tada.mp3
   fi
   echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE" >> $LOG_FILE
   log "REPORT DONE... quitting"
