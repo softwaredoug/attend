@@ -2,7 +2,7 @@
 
 OUTPUT_FILE="/tmp/attend_output.txt"
 PID_FILE="/tmp/attend_process.pid"
-LOG_FILE="/tmp/attendg_log.txt"
+LOG_FILE="/tmp/attend_log.txt"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
 mock() {
@@ -254,6 +254,8 @@ test_appends_to_existing_log() {
   single_focus_at_length 3000
   ./attend.sh start
   ./attend.sh stop
+  echo $LOG_FILE
+  cat $LOG_FILE 
   wc -l $LOG_FILE | grep -q "2"
   return $?
 }

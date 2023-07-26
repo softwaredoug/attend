@@ -168,7 +168,9 @@ report() {
   session_length_secs=$(echo "($work_end - $work_begin) / 1000" | bc)
   output ""
   output "Work session done:"
-  output "  $session_name"
+  if [[ "$session_name" != "" ]]; then
+    output "  $session_name"
+  fi
   output "----------------------------------------"
   output "...All scores in effective seconds..."
   output "   the more time you spend on a task, the more the seconds accumulate!..."
@@ -208,6 +210,7 @@ report() {
     output "New high max score! -- $MAX_SCORE"
     $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
+  log "Append to log file -- $LOG_FILE"
   echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE" >> $LOG_FILE
   log "REPORT DONE... quitting"
   exit 0
