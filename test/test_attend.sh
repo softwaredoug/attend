@@ -2,7 +2,7 @@
 
 OUTPUT_FILE="/tmp/attend_output.txt"
 PID_FILE="/tmp/attend_process.pid"
-LOG_FILE="/tmp/focus_log.txt"
+LOG_FILE="/tmp/attend_log.txt"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
 mock() {
