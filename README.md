@@ -5,6 +5,7 @@
 Scores your work sessions based on how little you switch the main focus in OSX. 
 
 More time in one app == higher score.
+(also plays a bell anytime you switch your OSX task to remind you)
 
 ```
 attend start
