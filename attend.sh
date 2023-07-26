@@ -1,20 +1,21 @@
 #!/bin/bash
+PROCESS_NAME="attend"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 idle_call() {
-  ./idle.sh "$@"
+  "$SCRIPT_DIR"/idle.sh "$@"
 }
 
 focus_call() {
-    focus=$(osascript focusedapp.scpt 2> /dev/null)
-    focus=$(focus_name "$focus")
-    echo "$focus"
+  focus=$(osascript "$SCRIPT_DIR"/focusedapp.scpt 2> /dev/null)
+  focus=$(focus_name "$focus")
+  echo "$focus"
 }
 
 afplay_call() {
-  afplay "$@" &
+  "$SCRIPT_DIR"/afplay "$@" &
 }
 
-PROCESS_NAME="attend"
 
 GET_FOCUS=focus_call
 SLEEP=sleep
@@ -106,7 +107,7 @@ output() {
   echo "$1" >> $OUTPUT_FILE
 }
 
-. log.sh
+. "$SCRIPT_DIR"/log.sh
 
 log "LOG START"
 
@@ -197,13 +198,13 @@ report() {
   if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
     output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
     output "New high average score! -- $avg_score"
-    $AFPLAY ./tada.mp3
+    $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
   
   if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
     output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
     output "New high max score! -- $MAX_SCORE"
-    $AFPLAY ./tada.mp3
+    $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
   echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE" >> $LOG_FILE
   log "REPORT DONE... quitting"
