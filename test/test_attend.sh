@@ -179,7 +179,6 @@ test_attend_keeps_output() {
 test_attend_long_focus_scores_near_actual_time() {
   single_focus_at_length 3000
   ./attend.sh start
-  sleep 1
   ./attend.sh stop
   max_score=$(get_stat "Max focus score")
   check_gt $max_score 2900
@@ -198,7 +197,6 @@ test_attend_two_long_focus_scores_near_actual_time() {
   two_apps_focused_at_length 3000
   expected_score=6000
   ./attend.sh start
-  sleep 1
   ./attend.sh stop
   max_score=$(get_stat "Max focus score")
   check_gt $max_score $(echo "$expected_score - 100" | bc)

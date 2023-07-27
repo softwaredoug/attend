@@ -43,6 +43,10 @@ TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
+. "$SCRIPT_DIR"/log.sh
+
+log "LOG START"
+
 #------------------------------
 wait_for_process() {
   pid=$1
@@ -53,6 +57,16 @@ wait_for_process() {
     which_processes=$(ps | grep "$pid.*$name" | grep -v grep)
     num_processes=$(ps | grep "$pid.*$name" | grep -v grep | wc -l)
   done
+}
+
+compute() {
+  echo "$@" | bc -l
+  if [ $? -ne 0 ]; then
+    local calling_line_info=$(caller 0)
+    local calling_line=${calling_line_info% *}
+    log "🚨 Error computing $@"
+    log "    at line $calling_line"
+  fi
 }
 
 
@@ -112,21 +126,18 @@ output() {
   let "NUM_LINES = $NUM_LINES + 1"  
 }
 
-. "$SCRIPT_DIR"/log.sh
-
-log "LOG START"
 
 scoring_function() {
   time=$1
   # Focus at focus_full seconds treats seconds as full time focus
   focus_full=360
-  focus_mid=$(echo "$focus_full / 2" | bc)
-  power=$(echo "-(0.005 * ($time - $focus_mid) )" | bc)
+  focus_mid=$(compute "$focus_full / 2")
+  power=$(compute "-(0.005 * ($time - $focus_mid) )")
   # Logistic function for time multiple
-  slope=$(echo "1 / (e($power) + 1)" | bc -l)
+  slope=$(compute "1 / (e($power) + 1)")
 
   # score is effective seconds
-  score=$(echo "$time * $slope" | bc -l)
+  score=$(compute "$time * $slope")
   echo "$score"
 }
 
@@ -134,16 +145,16 @@ update_scores() {
   time=$($GDATE $MS_PATTERN )
   # calculate the time spent on the last focused app
   idle=$(cat $IDLE_TIME_FILE)
-  this_idle=$(echo "$idle - $LAST_IDLE" | bc)
+  this_idle=$(compute "$idle - $LAST_IDLE")
   log "LAST_TIME:$LAST_TIME time:$time idle:$idle this_idle:$this_idle"
   let "time_diff = $time - $LAST_TIME"
   if [ "$time_diff" -gt "0" ]; then
-    time_no_idle=$(echo "$time_diff - $this_idle" | bc)
-    time_diff_secs=$(echo "$time_no_idle / 1000" | bc)
+    time_no_idle=$(compute "$time_diff - $this_idle")
+    time_diff_secs=$(compute "$time_no_idle / 1000")
     this_score=$(scoring_function "$time_diff_secs")
 
-    TOT_SCORE=$(echo "$TOT_SCORE + $this_score" | bc)
-    TOT_IDLE=$(echo "$TOT_IDLE + $this_idle" | bc)
+    TOT_SCORE=$(compute "$TOT_SCORE + $this_score")
+    TOT_IDLE=$(compute "$TOT_IDLE + $this_idle")
     let "NUM_SWITCHES = $NUM_SWITCHES + 1"
     if [ $(echo "$this_score > $MAX_SCORE" | bc) -eq 1 ]; then
       MAX_SCORE=$this_score
@@ -168,6 +179,9 @@ report() {
   log "idle killed"
 
   session_length_secs=$(echo "($work_end - $work_begin) / 1000" | bc)
+  if [ "$session_length_secs" -eq "0" ]; then
+    session_length_secs=1
+  fi
   output ""
   output "Work session done:"
   if [[ "$session_name" != "" ]]; then
@@ -182,18 +196,21 @@ report() {
   highest_max=$(sort -k8 -n -r $LOG_FILE 2> /dev/null | head -n 1 | awk '{print $8}')
   # If the current score is higher than the highest score
 
-  avg_score=$(echo "$TOT_SCORE / $NUM_SWITCHES" | bc -l)
+  avg_score=$(compute "$TOT_SCORE / $NUM_SWITCHES")
+  work_ratio=$(compute "$TOT_SCORE / $session_length_secs")
+  session_length_mins=$(compute "$session_length_secs / 60.0")
+  session_length_mins=$(printf "%.2f" $session_length_mins)
   output "You started working at $work_begin_ts"
-  output "Work session length: $session_length_secs seconds"
+  output "Work session length: $session_length_mins mins"
   output "----"
-  output "Average focus score: $avg_score"
+  output "Focus ratio: $work_ratio"
+  output "Total effective score: $TOT_SCORE"
+  output "Total idle time: $TOT_IDLE"
   output "Max focus score: $MAX_SCORE"
   output "Most focused app: $MAX_APP"
   output "Num task switches: $NUM_SWITCHES"
-  output "Total idle time: $TOT_IDLE"
 
   output "----"
-  output "Highest average score: $highest_avg"
   output "Highest     max score: $highest_max"
 
   if [ ! -f $LOG_FILE ]; then
