@@ -208,6 +208,16 @@ test_attend_two_long_focus_scores_near_actual_time() {
   fi
 }
 
+test_attend_two_long_focus_scores_near_full_percentage() {
+  two_apps_focused_at_length 3000
+  expected_percentage_gt=99.5
+  ./attend.sh start
+  ./attend.sh stop
+  percentage=$(get_stat "Effective focus %")
+  check_gt $percentage $expected_percentage_gt
+  return $?
+}
+
 test_attend_tracks_longest_app() {
   single_focus_at_length 3000
   ./attend.sh start

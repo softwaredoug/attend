@@ -182,6 +182,7 @@ report() {
   if [ "$session_length_secs" -eq "0" ]; then
     session_length_secs=1
   fi
+  session_length_no_idle=$(compute "$session_length_secs - $TOT_IDLE")
   output ""
   output "Work session done:"
   if [[ "$session_name" != "" ]]; then
@@ -197,13 +198,14 @@ report() {
   # If the current score is higher than the highest score
 
   avg_score=$(compute "$TOT_SCORE / $NUM_SWITCHES")
-  work_ratio=$(compute "$TOT_SCORE / $session_length_secs")
+  work_ratio=$(compute "100 * ($TOT_SCORE / $session_length_no_idle)")
   session_length_mins=$(compute "$session_length_secs / 60.0")
   session_length_mins=$(printf "%.2f" $session_length_mins)
   output "You started working at $work_begin_ts"
   output "Work session length: $session_length_mins mins"
+  output "Work session without idle: $session_length_no_idle secs"
   output "----"
-  output "Focus ratio: $work_ratio"
+  output "Effective focus %: $work_ratio"
   output "Total effective score: $TOT_SCORE"
   output "Total idle time: $TOT_IDLE"
   output "Max focus score: $MAX_SCORE"
