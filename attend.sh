@@ -171,7 +171,7 @@ report() {
   work_begin_ts="$2"
   session_name="$3"
   work_end=$($GDATE $MS_PATTERN)
-  word_end_ts=$($GDATE $TIMESTAMP_PATTERN)
+  work_end_ts=$($GDATE $TIMESTAMP_PATTERN)
  
   log "killing idle process at $IDLE_PID"
   rm -f $IDLE_TIME_FILE
@@ -206,11 +206,17 @@ report() {
   output "Work session without idle: $session_length_no_idle secs"
   output "----"
   output "Effective focus %: $work_ratio"
+  
+  if [[ $(echo "$work_ratio > 100.0" | bc) -eq 1 ]]; then
+    log "🚨 work_ratio is greater than 100%: $work_ratio"
+  elif [[ $(echo "$work_ratio < 0.0" | bc) -eq 1 ]]; then
+    log "🚨 work_ratio is less than 0%: $work_ratio"
+  fi
 
   reporting_minutes=(5 10 20 30 45 60 90 120)
   max_percentages=(0 0 0 0 0 0 0 0)
 
-  if [[ -f $ATTEND_LOG ]]; then
+  if [[ -f "$LOG_FILE" ]]; then
     # Loop lines in LOG_FILE to compute work_ratio per line
     while IFS= read -r line; do
       # Get the work ratio
@@ -220,23 +226,42 @@ report() {
       this_session_length_no_idle=$(compute "$this_session_length_secs - $this_idle_time")
       this_score=$(echo $line | awk '{print $7}')
       this_percentage=$(compute "100 * ($this_score / $this_session_length_no_idle)")
+      this_session_length_mins=$(compute "$this_session_length_secs / 60.0")
+
+      log "LINE>$line"
 
       log "this_session_length_secs: $this_session_length_secs this_idle_time: $this_idle_time this_session_length_no_idle: $this_session_length_no_idle this_score: $this_score this_percentage: $this_percentage"
 
       # Loop through reporting_minutes
       idx=0
       for min_length in "${reporting_minutes[@]}"; do
-        if [[ "$work_ratio" -gt "${max_percentages[$idx]}" ]]; then
-          max_percentages[$idx]=$this_percentage
+        if [[ $(echo "$this_session_length_mins >= $min_length" | bc) -eq 1 ]]; then
+          log "this_session_length_mins: $this_session_length_mins min_length: $min_length"
+          if [[ $(echo "$this_percentage > ${max_percentages[$idx]}" | bc) -eq 1 ]]; then
+            max_percentages[$idx]=$this_percentage
+          fi
+          if [[ $(echo "$this_percentage > 100.0" | bc) -eq 1 ]]; then
+            log "🚨 - this_percentage: $this_percentage > 100.0"
+          elif [[ $(echo "$this_percentage < 0.0" | bc) -eq 1 ]]; then
+            log "🚨 - this_percentage: $this_percentage < 0.0"
+          fi
         fi
         idx=$((idx+1))
       done
     done < $LOG_FILE
+  else
+    log "No attend log file found at $LOG_FILE"
   fi
 
   idx=0
+  for perc in "${max_percentages[@]}"; do
+    log "perc: $idx -- $perc"
+    idx=$((idx+1))
+  done
+
+  idx=0
   for min_length in "${reporting_minutes[@]}"; do
-    if [[ "$session_length_no_idle" -gt "$min_length" ]]; then
+    if [[ $(echo "$session_length_mins >= $min_length" | bc) -eq 1 ]]; then
       if [[ $(echo "$work_ratio > ${max_percentages[$idx]}" | bc) -eq 1 ]]; then
         output " 🎉🎉🎉🎉🎉🎉🎉🎉🎉"
         output " New high score for $min_length min session! -- $work_ratio"
@@ -274,6 +299,7 @@ report() {
   if [[ ! -f $LOG_FILE ]]; then
     touch $LOG_FILE
   fi
+  log "work_end_ts:$work_end_ts work_begin_ts:$work_begin_ts work_end:$work_end"
   echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE" >> $LOG_FILE
   tail -n $NUM_LINES $OUTPUT_FILE
   echo "View full work log at $OUTPUT_FILE"

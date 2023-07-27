@@ -67,6 +67,23 @@ default_returns() {
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
 }
 
+poor_focus() {
+  begin_focus=1000
+  focus_incr=500
+  resp_on_call_count 1 'if [[ "$1" == "+%s%3N" ]]; then echo "'$begin_focus'"; fi' gdate_mock
+  on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
+  resp_on_call_count_gte 2 ' if [[ "$1" == "+%s%3N" ]]; then let "next_focus = '$begin_focus' + ($call_count * '$focus_incr')"; echo "$next_focus"; fi' gdate_mock
+
+  resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 2 'echo "Terminal"' focus_mock
+  resp_on_call_count 3 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 4 'echo "Terminal"' focus_mock
+  resp_on_call_count 5 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 6 'echo "Terminal"' focus_mock
+  
+  resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
+}
+
 single_focus_at_length() {
   focus_ms=$(echo "$1 * 1000" | bc)
   begin_focus=1000
@@ -261,13 +278,68 @@ test_detects_new_high_score_on_empty_log() {
 
 test_detects_new_high_score() {
   # last two values avg, max
-  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 6 1 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
   cat $LOG_FILE
   single_focus_at_length 3000
   ./attend.sh start
   ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "New high max score"
   return $?
+}
+
+test_detects_new_high_ratios() {
+  this_session_length_secs=1200.0
+  this_session_length_mins=$(echo "$this_session_length_secs / 60.0" | bc)
+  this_idle_time=100.0
+  this_effective_secs=100.0
+  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 6 $this_session_length_secs $this_idle_time $this_effective_secs 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+
+  new_session_length_secs=3000
+  new_session_length_mins=$(echo "$new_session_length_secs / 60.0" | bc)
+  single_focus_at_length $new_session_length_secs
+  ./attend.sh start
+  ./attend.sh stop
+  reporting_minutes=(5 10 20 30 45 60 90 120)
+  for min_length in "${reporting_minutes[@]}"; do
+    if [[ $new_session_length_mins -ge $min_length ]]; then
+      echo "Check for high score... for $min_length"
+      cat $OUTPUT_FILE | grep -q " New high score for $min_length min session! -- $work_ratio"
+      success=$?
+    else
+      cat $OUTPUT_FILE | grep -q " New high score for $min_length min session! -- $work_ratio"
+      found=$?
+      [[ "$found" != 0 ]]
+      success=$?
+    fi
+    echo "success: $success"
+    if [[ $success -ne 0 ]]; then
+      echo "failed for $min_length"
+      return 1
+    fi
+  done
+}
+
+test_does_not_detect_high_ratios() {
+  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 1210.0 6 1200.0 100.0 100.0 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  echo "2018-01-01T00:00 2018-01-01T15:40:54 3002001 3001 0 2 3000.99875332642988461642 1500.49937666321494230821 3000.99875332642988461642" >> $LOG_FILE
+
+  poor_focus
+  ./attend.sh start
+  ./attend.sh stop
+  reporting_minutes=(5 10 20 30 45 60 90 120)
+  for min_length in "${reporting_minutes[@]}"; do
+    # no records should be set
+    cat $OUTPUT_FILE | grep -q " New high score for $min_length min session! -- $work_ratio"
+    found=$?
+    [[ "$found" != 0 ]]
+    success=$?
+    echo "success: $success"
+    if [[ $success -ne 0 ]]; then
+      echo "failed for $min_length"
+      return 1
+    fi
+  done
+  cat $LOG_FILE > test_log.txt
 }
 
 test_appends_to_existing_log() {
