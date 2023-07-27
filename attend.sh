@@ -43,7 +43,7 @@ TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
-. "$SCRIPT_DIR"/log.sh
+. "$SCRIPT_DIR"/log_debug.sh
 
 log "LOG START"
 
@@ -206,6 +206,45 @@ report() {
   output "Work session without idle: $session_length_no_idle secs"
   output "----"
   output "Effective focus %: $work_ratio"
+
+  reporting_minutes=(5 10 20 30 45 60 90 120)
+  max_percentages=(0 0 0 0 0 0 0 0)
+
+  if [[ -f $ATTEND_LOG ]]; then
+    # Loop lines in LOG_FILE to compute work_ratio per line
+    while IFS= read -r line; do
+      # Get the work ratio
+      this_session_length_secs=$(echo $line | awk '{print $4}')
+      this_idle_time=$(echo $line | awk '{print $5}')
+      # Get the session length
+      this_session_length_no_idle=$(compute "$this_session_length_secs - $this_idle_time")
+      this_score=$(echo $line | awk '{print $7}')
+      this_percentage=$(compute "100 * ($this_score / $this_session_length_no_idle)")
+
+      log "this_session_length_secs: $this_session_length_secs this_idle_time: $this_idle_time this_session_length_no_idle: $this_session_length_no_idle this_score: $this_score this_percentage: $this_percentage"
+
+      # Loop through reporting_minutes
+      idx=0
+      for min_length in "${reporting_minutes[@]}"; do
+        if [[ "$work_ratio" -gt "${max_percentages[$idx]}" ]]; then
+          max_percentages[$idx]=$this_percentage
+        fi
+        idx=$((idx+1))
+      done
+    done < $LOG_FILE
+  fi
+
+  idx=0
+  for min_length in "${reporting_minutes[@]}"; do
+    if [[ "$session_length_no_idle" -gt "$min_length" ]]; then
+      if [[ $(echo "$work_ratio > ${max_percentages[$idx]}" | bc) -eq 1 ]]; then
+        output " 🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+        output " New high score for $min_length min session! -- $work_ratio"
+      fi
+    fi
+    idx=$((idx+1))
+  done
+
   output "Total effective score: $TOT_SCORE"
   output "Total idle time: $TOT_IDLE"
   output "Max focus score: $MAX_SCORE"
