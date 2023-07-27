@@ -149,7 +149,6 @@ test_attend_produces_output() {
   default_returns
 
   ./attend.sh start
-  sleep 1
   ./attend.sh stop
   if [[ -f $OUTPUT_FILE ]]; then
     return 0
@@ -162,11 +161,9 @@ test_attend_keeps_output() {
   default_returns
 
   ./attend.sh start
-  sleep 1
   ./attend.sh stop
   wc_first=$(cat $OUTPUT_FILE | wc -l)
   ./attend.sh start
-  sleep 1
   ./attend.sh stop
   wc_second=$(cat $OUTPUT_FILE | wc -l)
   if [[ $wc_first -lt $wc_second ]]; then
@@ -214,7 +211,6 @@ test_attend_two_long_focus_scores_near_actual_time() {
 test_attend_tracks_longest_app() {
   single_focus_at_length 3000
   ./attend.sh start
-  sleep 1
   ./attend.sh stop
   longest_app=$(get_stat "Most focused app")
   echo "longest_app: $longest_app"
