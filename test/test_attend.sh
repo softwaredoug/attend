@@ -278,7 +278,7 @@ test_detects_new_high_score_on_empty_log() {
 
 test_detects_new_high_score() {
   # last two values avg, max
-  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 6 1 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 6 1 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 My_longest_app" > $LOG_FILE
   cat $LOG_FILE
   single_focus_at_length 3000
   ./attend.sh start
@@ -292,7 +292,7 @@ test_detects_new_high_ratios() {
   this_session_length_mins=$(echo "$this_session_length_secs / 60.0" | bc)
   this_idle_time=100.0
   this_effective_secs=100.0
-  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 6 $this_session_length_secs $this_idle_time $this_effective_secs 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 6 $this_session_length_secs $this_idle_time $this_effective_secs 0.36466196014857904311 0.87642818572655602893 My_longest_app" > $LOG_FILE
 
   new_session_length_secs=3000
   new_session_length_mins=$(echo "$new_session_length_secs / 60.0" | bc)
@@ -320,8 +320,8 @@ test_detects_new_high_ratios() {
 }
 
 test_does_not_detect_high_ratios() {
-  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 1210.0 6 1200.0 100.0 100.0 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
-  echo "2018-01-01T00:00 2018-01-01T15:40:54 3002001 3001 0 2 3000.99875332642988461642 1500.49937666321494230821 3000.99875332642988461642" >> $LOG_FILE
+  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 1210.0 6 1200.0 100.0 100.0 0.36466196014857904311 0.87642818572655602893 app sess_name" > $LOG_FILE
+  echo "2018-01-01T00:00 2018-01-01T15:40:54 3002001 3001 0 2 3000.99875332642988461642 1500.49937666321494230821 3000.99875332642988461642 an_app sess_name" >> $LOG_FILE
 
   poor_focus
   ./attend.sh start
@@ -344,7 +344,7 @@ test_does_not_detect_high_ratios() {
 
 test_appends_to_existing_log() {
   # last two values avg, max
-  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app sess_name" > $LOG_FILE
   single_focus_at_length 3000
   ./attend.sh start
   ./attend.sh stop
@@ -360,9 +360,25 @@ test_prints_work_session_name() {
   return $?
 }
 
+test_logs_work_session_name() {
+  single_focus_at_length 3000
+  ./attend.sh start "my task to do the thing"
+  ./attend.sh stop
+  cat $LOG_FILE | grep -q "my_task"
+  return $?
+}
+
+test_logs_max_app_name() {
+  single_focus_at_length 3000
+  ./attend.sh start
+  ./attend.sh stop
+  cat $LOG_FILE | grep -q "Google_Chrome"
+  return $?
+}
+
 test_doesnt_detect_high_if_not_higher() {
   # last two values avg, max
-  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893" > $LOG_FILE
+  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app sess_name" > $LOG_FILE
   cat $LOG_FILE
   single_focus_at_length 1
   ./attend.sh start

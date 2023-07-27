@@ -43,7 +43,7 @@ TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
-. "$SCRIPT_DIR"/log_debug.sh
+. "$SCRIPT_DIR"/log.sh
 
 log "LOG START"
 
@@ -127,6 +127,8 @@ output() {
 }
 
 
+# Compute effective seconds for the previous task
+# basen on a logistic multiple that peaks focus at 360 seconds
 scoring_function() {
   time=$1
   # Focus at focus_full seconds treats seconds as full time focus
@@ -172,7 +174,7 @@ report() {
   session_name="$3"
   work_end=$($GDATE $MS_PATTERN)
   work_end_ts=$($GDATE $TIMESTAMP_PATTERN)
- 
+  
   log "killing idle process at $IDLE_PID"
   rm -f $IDLE_TIME_FILE
   wait_for_process $IDLE_PID 'idle'
@@ -216,6 +218,7 @@ report() {
   reporting_minutes=(5 10 20 30 45 60 90 120)
   max_percentages=(0 0 0 0 0 0 0 0)
 
+  # Compute records for each reporting minute segment from the past work sessions
   if [[ -f "$LOG_FILE" ]]; then
     # Loop lines in LOG_FILE to compute work_ratio per line
     while IFS= read -r line; do
@@ -227,10 +230,6 @@ report() {
       this_score=$(echo $line | awk '{print $7}')
       this_percentage=$(compute "100 * ($this_score / $this_session_length_no_idle)")
       this_session_length_mins=$(compute "$this_session_length_secs / 60.0")
-
-      log "LINE>$line"
-
-      log "this_session_length_secs: $this_session_length_secs this_idle_time: $this_idle_time this_session_length_no_idle: $this_session_length_no_idle this_score: $this_score this_percentage: $this_percentage"
 
       # Loop through reporting_minutes
       idx=0
@@ -254,17 +253,11 @@ report() {
   fi
 
   idx=0
-  for perc in "${max_percentages[@]}"; do
-    log "perc: $idx -- $perc"
-    idx=$((idx+1))
-  done
-
-  idx=0
   for min_length in "${reporting_minutes[@]}"; do
     if [[ $(echo "$session_length_mins >= $min_length" | bc) -eq 1 ]]; then
       if [[ $(echo "$work_ratio > ${max_percentages[$idx]}" | bc) -eq 1 ]]; then
         output " 🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-        output " New high score for $min_length min session! -- $work_ratio"
+        output " New high score for $min_length min session! -- $(printf %.2f $work_ratio)"
       fi
     fi
     idx=$((idx+1))
@@ -284,23 +277,22 @@ report() {
     highest_avg=0
     highest_max=0
   fi
-  if [ $(echo "$avg_score > $highest_avg" | bc) -eq 1 ]; then
-    output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-    output "New high average score! -- $avg_score"
-    $AFPLAY "$SCRIPT_DIR"/tada.mp3
-  fi
   
   if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
     output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-    output "New high max score! -- $MAX_SCORE"
+    output "New high max score! -- $(printf %.2f $MAX_SCORE) "
     $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
   log "Append to log file -- $LOG_FILE"
   if [[ ! -f $LOG_FILE ]]; then
     touch $LOG_FILE
   fi
+  
+  session_name_no_ws=$(echo "$session_name" | tr -s '[:space:]' '_')
+  max_app_no_ws=$(echo "$MAX_APP" | tr -s '[:space:]' '_')
+
   log "work_end_ts:$work_end_ts work_begin_ts:$work_begin_ts work_end:$work_end"
-  echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE" >> $LOG_FILE
+  echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE $max_app_no_ws $session_name_no_ws" >> $LOG_FILE
   tail -n $NUM_LINES $OUTPUT_FILE
   echo "View full work log at $OUTPUT_FILE"
   echo "Reset with rm $OUTPUT_FILE"
@@ -364,6 +356,10 @@ if [[ "$1" == "start" ]]; then
     exit 1
   fi
   touch $PID_FILE
+  session_name="$2"
+  if [[ "$session_name" == "" ]]; then
+    session_name="Unnamed Work Session"
+  fi
   track_focus "$2" & 
   pid=$!
   echo "$pid" > $PID_FILE
