@@ -69,6 +69,16 @@ compute() {
   fi
 }
 
+check() {
+  # Perform boolean check
+  # ie bc for a > b
+  check=$(echo "$@" | bc)
+  if [[ "$check" -eq "1" ]]; then
+    return 0
+  fi
+  return 1
+}
+
 
 # These apps we can use the window name to get the front tab
 # And use that to define the 'focus'
@@ -127,8 +137,7 @@ output() {
 }
 
 
-# Compute effective seconds for the previous task
-# basen on a logistic multiple that peaks focus at 360 seconds
+# Compute effective seconds
 scoring_function() {
   time=$1
   # Focus at focus_full seconds treats seconds as full time focus
@@ -158,7 +167,7 @@ update_scores() {
     TOT_SCORE=$(compute "$TOT_SCORE + $this_score")
     TOT_IDLE=$(compute "$TOT_IDLE + $this_idle")
     let "NUM_SWITCHES = $NUM_SWITCHES + 1"
-    if [ $(echo "$this_score > $MAX_SCORE" | bc) -eq 1 ]; then
+    if check "$this_score > $MAX_SCORE"; then
       MAX_SCORE=$this_score
       MAX_APP=$1
     fi
@@ -180,7 +189,7 @@ report() {
   wait_for_process $IDLE_PID 'idle'
   log "idle killed"
 
-  session_length_secs=$(echo "($work_end - $work_begin) / 1000" | bc)
+  session_length_secs=$(compute "($work_end - $work_begin) / 1000")
   if [ "$session_length_secs" -eq "0" ]; then
     session_length_secs=1
   fi
@@ -209,9 +218,9 @@ report() {
   output "----"
   output "Effective focus %: $work_ratio"
   
-  if [[ $(echo "$work_ratio > 100.0" | bc) -eq 1 ]]; then
+  if check "$work_ratio > 100.0"; then
     log "🚨 work_ratio is greater than 100%: $work_ratio"
-  elif [[ $(echo "$work_ratio < 0.0" | bc) -eq 1 ]]; then
+  elif check "$work_ratio < 0.0"; then
     log "🚨 work_ratio is less than 0%: $work_ratio"
   fi
 
@@ -234,14 +243,14 @@ report() {
       # Loop through reporting_minutes
       idx=0
       for min_length in "${reporting_minutes[@]}"; do
-        if [[ $(echo "$this_session_length_mins >= $min_length" | bc) -eq 1 ]]; then
+        if check "$this_session_length_mins >= $min_length"; then
           log "this_session_length_mins: $this_session_length_mins min_length: $min_length"
-          if [[ $(echo "$this_percentage > ${max_percentages[$idx]}" | bc) -eq 1 ]]; then
+          if check "$this_percentage > ${max_percentages[$idx]}"; then
             max_percentages[$idx]=$this_percentage
           fi
-          if [[ $(echo "$this_percentage > 100.0" | bc) -eq 1 ]]; then
+          if check "$this_percentage > 100.0"; then
             log "🚨 - this_percentage: $this_percentage > 100.0"
-          elif [[ $(echo "$this_percentage < 0.0" | bc) -eq 1 ]]; then
+          elif check "$this_percentage < 0.0"; then
             log "🚨 - this_percentage: $this_percentage < 0.0"
           fi
         fi
@@ -254,8 +263,8 @@ report() {
 
   idx=0
   for min_length in "${reporting_minutes[@]}"; do
-    if [[ $(echo "$session_length_mins >= $min_length" | bc) -eq 1 ]]; then
-      if [[ $(echo "$work_ratio > ${max_percentages[$idx]}" | bc) -eq 1 ]]; then
+    if check "$session_length_mins >= $min_length"; then
+      if check "$work_ratio > ${max_percentages[$idx]}"; then
         output " 🎉🎉🎉🎉🎉🎉🎉🎉🎉"
         output " New high score for $min_length min session! -- $(printf %.2f $work_ratio)"
       fi
@@ -278,7 +287,7 @@ report() {
     highest_max=0
   fi
   
-  if [ $(echo "$MAX_SCORE > $highest_max" | bc) -eq 1 ]; then
+  if check "$MAX_SCORE > $highest_max"; then
     output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
     output "New high max score! -- $(printf %.2f $MAX_SCORE) "
     $AFPLAY "$SCRIPT_DIR"/tada.mp3
