@@ -44,71 +44,16 @@ MS_PATTERN="+%s%3N"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
 . "$SCRIPT_DIR"/log_debug.sh
+. "$SCRIPT_DIR"/utils.sh
 
 log "LOG START"
 
 #------------------------------
-wait_for_process() {
-  pid=$1
-  name=$2
-  num_processes=$(ps | grep "$pid.*$name" | grep -v grep | wc -l)
-  while [ "$num_processes" -ge "1" ]; do
-    $SLEEP 1
-    which_processes=$(ps | grep "$pid.*$name" | grep -v grep)
-    num_processes=$(ps | grep "$pid.*$name" | grep -v grep | wc -l)
-  done
-}
-
 exit_attend() {
   rm -f $PID_FILE
   rm -f $IDLE_TIME_FILE
   exit 1
 }
-
-compute() {
-  echo "$@" | bc -l
-  if [ $? -ne 0 ]; then
-    local calling_line_info=$(caller 0)
-    local calling_line=${calling_line_info% *}
-    log "🚨 Error computing $@"
-    log "    at line $calling_line"
-  fi
-}
-
-check() {
-  # Perform boolean check
-  # ie bc for a > b
-  # Capture stderr to check for errors
-  err_check=$(echo "$@" | bc 2>&1)
-  err_len=${#err_check}
-  # if err_check longer than 0, then there was an error
-  if [[ "$err_len" -gt "4" ]]; then
-    local calling_line_info=$(caller 0)
-    local calling_line=${calling_line_info% *}
-    log "🚨 Error checking $@"
-    log "    at line $calling_line"
-    log "    error: $err_check"
-  fi
-  check=$(echo "$@" | bc)
-  if [[ "$check" -eq "1" ]]; then
-    return 0
-  fi
-  return 1
-}
-
-assert() {
-  if check "$1"; then
-    return
-  else
-    local calling_line_info=$(caller 0)
-    local calling_line=${calling_line_info% *}
-    log "🚨 Assertion failed $@"
-    log "    at line $calling_line"
-    log "    $2"
-    exit_attend
-  fi
-}
-
 
 # These apps we can use the window name to get the front tab
 # And use that to define the 'focus'
@@ -249,6 +194,8 @@ report() {
 
   avg_score=$(compute "$TOT_SCORE / $NUM_SWITCHES")
   log ">>> TOT_SCORE: $TOT_SCORE"
+  log ">>> TOT_IDLE: $TOT_IDLE"
+  log ">>> session_length_secs: $session_length_secs"
   log ">>> session_length_no_idle: $session_length_no_idle"
   log ">>> just ratio: $(compute "$TOT_SCORE / $session_length_no_idle")"
   work_ratio=$(compute "100 * ($TOT_SCORE / $session_length_no_idle)")
@@ -260,11 +207,8 @@ report() {
   output "----"
   output "Effective focus %: $work_ratio"
   
-  if check "$work_ratio > 100.0"; then
-    log "🚨 work_ratio is greater than 100%: $work_ratio"
-  elif check "$work_ratio < 0.0"; then
-    log "🚨 work_ratio is less than 0%: $work_ratio"
-  fi
+  assert "$work_ratio <= 100.0"
+  assert "$work_ratio >= 0.0" 
 
   reporting_minutes=(5 10 20 30 45 60 90 120)
   max_percentages=(0 0 0 0 0 0 0 0)
@@ -290,11 +234,8 @@ report() {
           if check "$this_percentage > ${max_percentages[$idx]}"; then
             max_percentages[$idx]=$this_percentage
           fi
-          if check "$this_percentage > 100.0"; then
-            log "🚨 - this_percentage: $this_percentage > 100.0"
-          elif check "$this_percentage < 0.0"; then
-            log "🚨 - this_percentage: $this_percentage < 0.0"
-          fi
+          assert "$this_percentage <= 100.0"
+          assert "$this_percentage >= 0.0" 
         fi
         idx=$((idx+1))
       done
@@ -386,7 +327,11 @@ track_focus() {
           $AFPLAY /System/Library/Sounds/Funk.aiff
           # if the last focused app is not empty
           # get the current time in milliseconds
-          update_scores "$lastfocus" "$work_begin"
+          if [ "$lastfocus" != "" ]; then
+            update_scores "$lastfocus" "$work_begin"
+          else
+            warn "Not updating focus switch because last_focus is empty"
+          fi
           # set the last focused app to the current focused app
           lastfocus=$focus
       fi

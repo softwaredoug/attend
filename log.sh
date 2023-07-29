@@ -3,3 +3,7 @@
 log() {
   return
 }
+
+warn() {
+  return
+}

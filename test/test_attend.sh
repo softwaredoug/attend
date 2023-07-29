@@ -5,6 +5,8 @@ PID_FILE="/tmp/attend_process.pid"
 LOG_FILE="/tmp/attend_log.txt"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
+. ./utils.sh
+
 mock() {
   cp test/command_mock.sh $1_mock
 }
@@ -25,7 +27,7 @@ clean_fixtures() {
   return
 }
 
-MOCKS=('idle' 'focus' 'sleep' 'afplay' 'gdate')
+MOCKS=('idle' 'focus' 'sleep' 'afplay' 'gdate' 'idle_sys')
 
 
 fixtures() {
@@ -387,6 +389,24 @@ test_doesnt_detect_high_if_not_higher() {
   if [[ $? -ne 0 ]]; then
     return 1
   fi
+}
+
+test_idle() {
+  resp_on_call_count 1 'echo "1"' idle_sys_mock
+  resp_on_call_count 2 'echo "1"' idle_sys_mock
+  resp_on_call_count_gte 3 'echo "0"' idle_sys_mock
+
+  ./idle.sh 1 &
+  IDLE_PID=$!
+  echo "pid:$IDLE_PID"
+  echo "lines:$(num_lines .last_idle_sys_mock_args)"
+  # Loop until 3 calls to idle_sys_mock
+  while [[ $(num_lines .last_idle_sys_mock_args) -lt 3 ]]; do
+    echo "waiting for idle -- $(num_lines .last_idle_sys_mock_args)"
+  done
+  rm $IDLE_TIME_FILE
+  echo "pid:$IDLE_PID"
+  wait_for_process $IDLE_PID
 }
 
 ###########################################

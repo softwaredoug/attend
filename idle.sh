@@ -1,37 +1,58 @@
 #!/bin/bash
+#
+# Accumulate a total idle time to the user
+#
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Start tracking total user idle time to a file
 # Only counting any idle periods > $1
 . "$SCRIPT_DIR"/log_debug.sh
+. "$SCRIPT_DIR"/utils.sh
+
+
+idle_sys() {
+  idle=$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}')
+  echo $idle
+}
+IDLE_SYS=idle_sys
+SLEEP=sleep
+
+if [[ -f 'idle_sys_mock' ]]; then
+  log "USING MOCK"
+  IDLE_SYS="./idle_sys_mock"
+  SLEEP="./sleep_mock"
+fi
 
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
-log "START BILLY IDLE"
+idle_counter() {
+  log "START BILLY IDLE"
 
-total_idle=0
-echo "$total_idle" > $IDLE_TIME_FILE
-log "IDLE FILE INIT:"
-log $(cat $IDLE_TIME_FILE)
+  total_idle=0
+  echo "$total_idle" > $IDLE_TIME_FILE
+  log "IDLE FILE INIT:"
+  log $(cat $IDLE_TIME_FILE)
 
-check_frequency="$1"
-last_idle=0
-while [[ -f $IDLE_TIME_FILE ]] ; do
-  idle=$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}')
-  # Accumulate idle if more than sleep period
-  period=$(echo "$idle - $last_idle" | bc)
-  idle_more_than_period=$(echo "$period > $check_frequency" | bc)
-  log "idle enough? $idle_more_than_period -> $period > $check_frequency"
-  if [[ $idle_more_than_period == "1" ]]; then
-    total_idle=$(echo "$total_idle + $period" | bc)
-    if [[ -f $IDLE_TIME_FILE ]]; then
-      echo $total_idle > $IDLE_TIME_FILE
+  check_frequency="$1"
+  last_idle=0
+  while [[ -f $IDLE_TIME_FILE ]] ; do
+    idle=$($IDLE_SYS)
+    # Accumulate idle if more than sleep period
+    period=$(compute "$idle - $last_idle")
+    if check "$period > $check_frequency"; then
+      total_idle=$(compute "$total_idle + $period")
+      if [[ -f $IDLE_TIME_FILE ]]; then
+        echo $total_idle > $IDLE_TIME_FILE
+      fi
     fi
-  fi
 
-  log "idle -> $idle; last_idle -> $last_idle; period -> $period; total_idle -> $total_idle"
-  last_idle=$idle
-  sleep $check_frequency
-done
+    log "idle -> $idle; last_idle -> $last_idle; period -> $period; total_idle -> $total_idle"
+    last_idle=$idle
+    $SLEEP $check_frequency
+  done
 
-log "END BILLY IDLE"
+  log "END BILLY IDLE"
+
+} 
+
+idle_counter "$1"
