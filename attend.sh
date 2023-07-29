@@ -43,7 +43,7 @@ TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
-. "$SCRIPT_DIR"/log.sh
+. "$SCRIPT_DIR"/log_debug.sh
 
 log "LOG START"
 
@@ -59,6 +59,12 @@ wait_for_process() {
   done
 }
 
+exit_attend() {
+  rm -f $PID_FILE
+  rm -f $IDLE_TIME_FILE
+  exit 1
+}
+
 compute() {
   echo "$@" | bc -l
   if [ $? -ne 0 ]; then
@@ -72,11 +78,35 @@ compute() {
 check() {
   # Perform boolean check
   # ie bc for a > b
+  # Capture stderr to check for errors
+  err_check=$(echo "$@" | bc 2>&1)
+  err_len=${#err_check}
+  # if err_check longer than 0, then there was an error
+  if [[ "$err_len" -gt "4" ]]; then
+    local calling_line_info=$(caller 0)
+    local calling_line=${calling_line_info% *}
+    log "🚨 Error checking $@"
+    log "    at line $calling_line"
+    log "    error: $err_check"
+  fi
   check=$(echo "$@" | bc)
   if [[ "$check" -eq "1" ]]; then
     return 0
   fi
   return 1
+}
+
+assert() {
+  if check "$1"; then
+    return
+  else
+    local calling_line_info=$(caller 0)
+    local calling_line=${calling_line_info% *}
+    log "🚨 Assertion failed $@"
+    log "    at line $calling_line"
+    log "    $2"
+    exit_attend
+  fi
 }
 
 
@@ -154,9 +184,12 @@ scoring_function() {
 
 update_scores() {
   time=$($GDATE $MS_PATTERN )
+  last_focus="$1"
+  work_begin="$2"
   # calculate the time spent on the last focused app
   idle=$(cat $IDLE_TIME_FILE)
   this_idle=$(compute "$idle - $LAST_IDLE")
+  session_time_secs=$(compute "$time - $work_begin")
   log "LAST_TIME:$LAST_TIME time:$time idle:$idle this_idle:$this_idle"
   let "time_diff = $time - $LAST_TIME"
   if [ "$time_diff" -gt "0" ]; then
@@ -166,12 +199,18 @@ update_scores() {
 
     TOT_SCORE=$(compute "$TOT_SCORE + $this_score")
     TOT_IDLE=$(compute "$TOT_IDLE + $this_idle")
+    session_time_secs_no_idle=$(compute "$session_time_secs - $TOT_IDLE")
+ 
+    assert "$this_score <= $time_diff_secs"
+    assert "$TOT_SCORE <= $session_time_secs"
+    assert "$TOT_SCORE <= $session_time_secs_no_idle"
+
     let "NUM_SWITCHES = $NUM_SWITCHES + 1"
     if check "$this_score > $MAX_SCORE"; then
       MAX_SCORE=$this_score
       MAX_APP=$1
     fi
-    log "update_scores: $1 time:$time score:$this_score tot_score:$TOT_SCORE idle:$idle last_idle:$LAST_IDLE tot_idle:$TOT_IDLE num_switches:$NUM_SWITCHES"
+    log ">> update_scores: $last_focus time:$time score:$this_score tot_score:$TOT_SCORE idle:$idle last_idle:$LAST_IDLE tot_idle:$TOT_IDLE num_switches:$NUM_SWITCHES"
     LAST_IDLE=$idle
     LAST_TIME=$time
   fi
@@ -190,7 +229,7 @@ report() {
   log "idle killed"
 
   session_length_secs=$(compute "($work_end - $work_begin) / 1000")
-  if [ "$session_length_secs" -eq "0" ]; then
+  if check "$session_length_secs == 0"; then
     session_length_secs=1
   fi
   session_length_no_idle=$(compute "$session_length_secs - $TOT_IDLE")
@@ -209,6 +248,9 @@ report() {
   # If the current score is higher than the highest score
 
   avg_score=$(compute "$TOT_SCORE / $NUM_SWITCHES")
+  log ">>> TOT_SCORE: $TOT_SCORE"
+  log ">>> session_length_no_idle: $session_length_no_idle"
+  log ">>> just ratio: $(compute "$TOT_SCORE / $session_length_no_idle")"
   work_ratio=$(compute "100 * ($TOT_SCORE / $session_length_no_idle)")
   session_length_mins=$(compute "$session_length_secs / 60.0")
   session_length_mins=$(printf "%.2f" $session_length_mins)
@@ -343,17 +385,15 @@ track_focus() {
           # play unpleasant sound
           $AFPLAY /System/Library/Sounds/Funk.aiff
           # if the last focused app is not empty
-          if [ "$lastfocus" != "" ]; then
-              # get the current time in milliseconds
-              update_scores "$lastfocus"
-          fi
+          # get the current time in milliseconds
+          update_scores "$lastfocus" "$work_begin"
           # set the last focused app to the current focused app
           lastfocus=$focus
       fi
   done
   log "track_focus main loop DONE"
   focus=$($GET_FOCUS)
-  update_scores "$lastfocus"
+  update_scores "$lastfocus" "$work_begin"
   report "$work_begin" "$work_begin_ts" "$session_name"
 }
 
