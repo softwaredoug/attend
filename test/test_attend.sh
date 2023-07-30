@@ -46,6 +46,15 @@ resp_on_call_count() {
   echo 'fi' >> $mock_script
 }
 
+wait_for_num_calls() {
+  call_count=$1
+  mock_script=$2
+  mock_args_file=".last_$mock_script"_args
+  while [[ $(num_lines $mock_args_file) -lt "$call_count" ]]; do
+    sleep 0.01
+  done
+}
+
 resp_on_call_count_gte() {
   on_call_count=$1
   cmd=$2
@@ -103,6 +112,32 @@ single_focus_at_length() {
   
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
 }
+
+
+single_focus_all_idle() {
+  focus_ms=$(echo "$1 * 1000" | bc)
+  begin_focus=0
+  end_focus=$(echo "$focus_ms + $begin_focus" | bc)
+  end_run=$(echo "$end_focus + 1001" | bc)
+
+  end_focus_secs=$(echo "$end_focus / 1000" | bc)
+  end_run_secs=$(echo "$end_run / 1000" | bc)
+
+  resp_on_call_count 1 'if [[ "$1" == "+%s%3N" ]]; then echo "'$begin_focus'"; fi' gdate_mock
+  resp_on_call_count 2 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus'"; fi' gdate_mock
+  resp_on_call_count 2 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus_secs'" > '$IDLE_TIME_FILE'; fi' gdate_mock
+  resp_on_call_count 3 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
+  resp_on_call_count 3 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus_secs'" > '$IDLE_TIME_FILE'; fi' gdate_mock
+  on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
+  resp_on_call_count_gte 4 ' if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
+
+  resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 2 'echo "Terminal"' focus_mock
+  resp_on_call_count_gte 3 'echo "Youdontwannaknow"' focus_mock
+ 
+  resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
+}
+
 
 two_apps_focused_at_length() {
   focus_ms=$(echo "$1 * 1000" | bc)
@@ -209,6 +244,19 @@ test_attend_long_focus_scores_near_actual_time() {
   fi
 }
 
+test_attend_long_focus_all_idle() {
+  single_focus_all_idle 3000
+  ./attend.sh start
+  sleep 1
+  ./attend.sh stop
+  max_score=$(get_stat "Max focus score")
+
+  if ! approx $max_score 0 0.3; then
+    echo "max_score: $max_score != 0"
+    return 1
+  fi
+}
+
 test_attend_two_long_focus_scores_near_actual_time() {
   two_apps_focused_at_length 3000
   expected_score=6000
@@ -251,6 +299,7 @@ test_attend_tracks_longest_app() {
 test_attend_short_focus_scores_a_lot_less_than_time() {
   single_focus_at_length 1
   ./attend.sh start
+  wait_for_num_calls 4 "gdate_mock"
   ./attend.sh stop
   max_score=$(get_stat "Max focus score")
   check_lt "$max_score" "1"
@@ -262,6 +311,7 @@ test_attend_short_focus_scores_a_lot_less_than_time() {
 test_attend_output_missing_log() {
   single_focus_at_length 3000
   ./attend.sh start
+  wait_for_num_calls 4 "gdate_mock"
   ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "LOG START"
   success=$?
@@ -273,6 +323,7 @@ test_attend_output_missing_log() {
 test_detects_new_high_score_on_empty_log() {
   single_focus_at_length 3000
   ./attend.sh start
+  wait_for_num_calls 4 "gdate_mock"
   ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "New high max score"
   return $?
@@ -284,6 +335,7 @@ test_detects_new_high_score() {
   cat $LOG_FILE
   single_focus_at_length 3000
   ./attend.sh start
+  wait_for_num_calls 4 "gdate_mock"
   ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "New high max score"
   return $?
@@ -300,6 +352,7 @@ test_detects_new_high_ratios() {
   new_session_length_mins=$(echo "$new_session_length_secs / 60.0" | bc)
   single_focus_at_length $new_session_length_secs
   ./attend.sh start
+  wait_for_num_calls 4 "gdate_mock"
   ./attend.sh stop
   reporting_minutes=(5 10 20 30 45 60 90 120)
   for min_length in "${reporting_minutes[@]}"; do
@@ -327,6 +380,7 @@ test_does_not_detect_high_ratios() {
 
   poor_focus
   ./attend.sh start
+  wait_for_num_calls 3 "gdate_mock"
   ./attend.sh stop
   reporting_minutes=(5 10 20 30 45 60 90 120)
   for min_length in "${reporting_minutes[@]}"; do
@@ -384,6 +438,7 @@ test_doesnt_detect_high_if_not_higher() {
   cat $LOG_FILE
   single_focus_at_length 1
   ./attend.sh start
+  wait_for_num_calls 3 "gdate_mock"
   ./attend.sh stop
   cat $OUTPUT_FILE | grep -vq "New high max score"
   if [[ $? -ne 0 ]]; then
@@ -398,9 +453,7 @@ test_idle() {
 
   ./idle.sh 1 &
   IDLE_PID=$!
-  while [[ $(num_lines .last_idle_sys_mock_args) -lt 4 ]]; do
-    idle_time=$(cat $IDLE_TIME_FILE)
-  done
+  wait_for_num_calls 4 "idle_sys_mock"
   idle_time=$(cat $IDLE_TIME_FILE)
   rm $IDLE_TIME_FILE
   wait_for_process $IDLE_PID
@@ -418,9 +471,7 @@ test_idle_ignores_less_than_check_freq() {
 
   ./idle.sh 1 &
   IDLE_PID=$!
-  while [[ $(num_lines .last_idle_sys_mock_args) -lt 4 ]]; do
-    idle_time=$(cat $IDLE_TIME_FILE)
-  done
+  wait_for_num_calls 4 "idle_sys_mock"
   idle_time=$(cat $IDLE_TIME_FILE)
   rm $IDLE_TIME_FILE
   wait_for_process $IDLE_PID
@@ -438,9 +489,7 @@ test_idle_accumulates_only_idles_above_check_freq() {
 
   ./idle.sh 1 &
   IDLE_PID=$!
-  while [[ $(num_lines .last_idle_sys_mock_args) -lt 4 ]]; do
-    idle_time=$(cat $IDLE_TIME_FILE)
-  done
+  wait_for_num_calls 4 "idle_sys_mock"
   idle_time=$(cat $IDLE_TIME_FILE)
   rm $IDLE_TIME_FILE
   wait_for_process $IDLE_PID
@@ -463,9 +512,7 @@ test_idle_accumulates_but_resets() {
 
   ./idle.sh 1 &
   IDLE_PID=$!
-  while [[ $(num_lines .last_idle_sys_mock_args) -lt 9 ]]; do
-    idle_time=$(cat $IDLE_TIME_FILE)
-  done
+  wait_for_num_calls 9 "idle_sys_mock"
   idle_time=$(cat $IDLE_TIME_FILE)
   rm $IDLE_TIME_FILE
   wait_for_process $IDLE_PID

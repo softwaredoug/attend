@@ -134,12 +134,19 @@ update_scores() {
   # calculate the time spent on the last focused app
   idle=$(cat $IDLE_TIME_FILE)
   this_idle=$(compute "$idle - $LAST_IDLE")
+  this_idle_ms=$(compute "$this_idle * 1000")
   session_time_secs=$(compute "$time - $work_begin")
-  log "LAST_TIME:$LAST_TIME time:$time idle:$idle this_idle:$this_idle"
   let "time_diff = $time - $LAST_TIME"
+  time_no_idle=$(compute "$time_diff - $this_idle_ms")
+  time_diff_secs=$(compute "$time_no_idle / 1000")
+  log "LAST_TIME-$LAST_TIME time:$time time_diff:$time_diff"
+  log "    IDLES-idle:$idle this_idle:$this_idle"
+  log "     TIME_DIFF:$time_diff"
+  log "       IDLE_MS:$this_idle_ms"
+  log "  TIME_NO_IDLE:$time_no_idle"
+  log "  TIME_DIFF_SE:$time_diff_secs"
   if [ "$time_diff" -gt "0" ]; then
-    time_no_idle=$(compute "$time_diff - $this_idle")
-    time_diff_secs=$(compute "$time_no_idle / 1000")
+   
     this_score=$(scoring_function "$time_diff_secs")
 
     TOT_SCORE=$(compute "$TOT_SCORE + $this_score")
@@ -155,7 +162,7 @@ update_scores() {
       MAX_SCORE=$this_score
       MAX_APP=$1
     fi
-    log ">> update_scores: $last_focus time:$time score:$this_score tot_score:$TOT_SCORE idle:$idle last_idle:$LAST_IDLE tot_idle:$TOT_IDLE num_switches:$NUM_SWITCHES"
+    log ">> update_scores: $last_focus time:$time score:$this_score tot_score:$TOT_SCORE idle:$idle last_idle:$LAST_IDLE tot_idle:$TOT_IDLE this_idle:$this_idle time_diff:$time_diff time_diff_secs:$time_diff_secs num_switches:$NUM_SWITCHES"
     LAST_IDLE=$idle
     LAST_TIME=$time
   fi

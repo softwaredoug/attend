@@ -1,5 +1,7 @@
 #!/bin/bash
 
+. "$SCRIPT_DIR"/log_debug.sh
+
 compute() {
   echo "$@" | bc -l
   if [ $? -ne 0 ]; then
@@ -34,7 +36,10 @@ check() {
 approx() {
   value=$1
   expected_value=$2
-  delta=0.05
+  delta=$3
+  if [[ $delta == "" ]]; then
+    delta=0.05
+  fi
 
   if check "$value >= $expected_value - $delta"; then
     if check "$value <= $expected_value + $delta"; then
