@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. "$SCRIPT_DIR"/log_debug.sh
+. "$SCRIPT_DIR"/log.sh
 
 compute() {
   echo "$@" | bc -l

@@ -43,7 +43,7 @@ TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
-. "$SCRIPT_DIR"/log_debug.sh
+. "$SCRIPT_DIR"/log.sh
 . "$SCRIPT_DIR"/utils.sh
 
 log "LOG START"
@@ -205,24 +205,27 @@ report() {
   log ">>> session_length_secs: $session_length_secs"
   log ">>> session_length_no_idle: $session_length_no_idle"
   log ">>> just ratio: $(compute "$TOT_SCORE / $session_length_no_idle")"
-  work_ratio=$(compute "100 * ($TOT_SCORE / $session_length_no_idle)")
+  work_percentage=$(compute "100 * ($TOT_SCORE / $session_length_no_idle)")
+  work_percentage=$(printf "%.2f" $work_percentage)
   session_length_mins=$(compute "$session_length_secs / 60.0")
   session_length_mins=$(printf "%.2f" $session_length_mins)
+  session_length_no_idle_mins=$(compute "$session_length_no_idle / 60.0")
+  session_length_no_idle_mins=$(printf "%.2f" $session_length_no_idle_mins)
   output "You started working at $work_begin_ts"
   output "Work session length: $session_length_mins mins"
-  output "Work session without idle: $session_length_no_idle secs"
+  output "Work session without idle: $session_length_no_idle_mins mins"
   output "----"
-  output "Effective focus %: $work_ratio"
+  output "Effective focus %: $work_percentage"
   
-  assert "$work_ratio <= 100.0"
-  assert "$work_ratio >= 0.0" 
+  assert "$work_percentage <= 100.0"
+  assert "$work_percentage >= 0.0" 
 
   reporting_minutes=(5 10 20 30 45 60 90 120)
   max_percentages=(0 0 0 0 0 0 0 0)
 
   # Compute records for each reporting minute segment from the past work sessions
   if [[ -f "$LOG_FILE" ]]; then
-    # Loop lines in LOG_FILE to compute work_ratio per line
+    # Loop lines in LOG_FILE to compute work_percentage per line
     while IFS= read -r line; do
       # Get the work ratio
       this_session_length_secs=$(echo $line | awk '{print $4}')
@@ -254,17 +257,25 @@ report() {
   idx=0
   for min_length in "${reporting_minutes[@]}"; do
     if check "$session_length_mins >= $min_length"; then
-      if check "$work_ratio > ${max_percentages[$idx]}"; then
+      if check "$work_percentage > ${max_percentages[$idx]}"; then
         output " 🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-        output " New high score for $min_length min session! -- $(printf %.2f $work_ratio)"
+        output " New high score for $min_length min session! -- $(printf %.2f $work_percentage)"
       fi
     fi
     idx=$((idx+1))
   done
 
-  output "Total effective score: $TOT_SCORE"
-  output "Total idle time: $TOT_IDLE"
+  TOT_SCORE=$(printf "%.2f" $TOT_SCORE)
+  output "Total effective seconds: $TOT_SCORE"
+
+  TOT_IDLE_MINS=$(compute "$TOT_IDLE / 60.0")
+  TOT_IDLE_MINS=$(printf "%.2f" $TOT_IDLE_MINS)
+  output "Total idle time: $TOT_IDLE_MINS mins"
+
+  MAX_SCORE=$(printf "%.2f" $MAX_SCORE)
   output "Max focus score: $MAX_SCORE"
+
+  output "----"
   output "Most focused app: $MAX_APP"
   output "Num task switches: $NUM_SWITCHES"
 
