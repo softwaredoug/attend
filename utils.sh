@@ -31,6 +31,19 @@ check() {
   return 1
 }
 
+approx() {
+  value=$1
+  expected_value=$2
+  delta=0.05
+
+  if check "$value >= $expected_value - $delta"; then
+    if check "$value <= $expected_value + $delta"; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
 assert() {
   if check "$1"; then
     return

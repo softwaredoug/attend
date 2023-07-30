@@ -393,20 +393,87 @@ test_doesnt_detect_high_if_not_higher() {
 
 test_idle() {
   resp_on_call_count 1 'echo "1"' idle_sys_mock
-  resp_on_call_count 2 'echo "1"' idle_sys_mock
-  resp_on_call_count_gte 3 'echo "0"' idle_sys_mock
+  resp_on_call_count 2 'echo "2"' idle_sys_mock
+  resp_on_call_count_gte 3 'echo "3"' idle_sys_mock
 
   ./idle.sh 1 &
   IDLE_PID=$!
-  echo "pid:$IDLE_PID"
-  echo "lines:$(num_lines .last_idle_sys_mock_args)"
-  # Loop until 3 calls to idle_sys_mock
-  while [[ $(num_lines .last_idle_sys_mock_args) -lt 3 ]]; do
-    echo "waiting for idle -- $(num_lines .last_idle_sys_mock_args)"
+  while [[ $(num_lines .last_idle_sys_mock_args) -lt 4 ]]; do
+    idle_time=$(cat $IDLE_TIME_FILE)
   done
+  idle_time=$(cat $IDLE_TIME_FILE)
   rm $IDLE_TIME_FILE
-  echo "pid:$IDLE_PID"
   wait_for_process $IDLE_PID
+
+  if ! approx "$idle_time" 3.0; then
+    echo "idle time was $idle_time"
+    return 1
+  fi
+}
+
+test_idle_ignores_less_than_check_freq() {
+  resp_on_call_count 1 'echo "0.5"' idle_sys_mock
+  resp_on_call_count 2 'echo "0.4"' idle_sys_mock
+  resp_on_call_count_gte 3 'echo "0.4"' idle_sys_mock
+
+  ./idle.sh 1 &
+  IDLE_PID=$!
+  while [[ $(num_lines .last_idle_sys_mock_args) -lt 4 ]]; do
+    idle_time=$(cat $IDLE_TIME_FILE)
+  done
+  idle_time=$(cat $IDLE_TIME_FILE)
+  rm $IDLE_TIME_FILE
+  wait_for_process $IDLE_PID
+
+  if ! approx "$idle_time" 0.0; then
+    echo "idle time was $idle_time"
+    return 1
+  fi
+}
+
+test_idle_accumulates_only_idles_above_check_freq() {
+  resp_on_call_count 1 'echo "0.5"' idle_sys_mock
+  resp_on_call_count 2 'echo "1.1"' idle_sys_mock
+  resp_on_call_count_gte 3 'echo "0.4"' idle_sys_mock
+
+  ./idle.sh 1 &
+  IDLE_PID=$!
+  while [[ $(num_lines .last_idle_sys_mock_args) -lt 4 ]]; do
+    idle_time=$(cat $IDLE_TIME_FILE)
+  done
+  idle_time=$(cat $IDLE_TIME_FILE)
+  rm $IDLE_TIME_FILE
+  wait_for_process $IDLE_PID
+
+  if ! approx "$idle_time" 1.1; then
+    echo "idle time was $idle_time"
+    return 1
+  fi
+}
+
+test_idle_accumulates_but_resets() {
+  resp_on_call_count 1 'echo "1.1"' idle_sys_mock
+  resp_on_call_count 2 'echo "2.1"' idle_sys_mock
+  resp_on_call_count 3 'echo "3.1"' idle_sys_mock
+  resp_on_call_count 4 'echo "0.0"' idle_sys_mock
+  resp_on_call_count 5 'echo "1.1"' idle_sys_mock
+  resp_on_call_count 6 'echo "2.1"' idle_sys_mock
+  resp_on_call_count 7 'echo "3.1"' idle_sys_mock
+  resp_on_call_count_gte 8 'echo "0.0"' idle_sys_mock
+
+  ./idle.sh 1 &
+  IDLE_PID=$!
+  while [[ $(num_lines .last_idle_sys_mock_args) -lt 9 ]]; do
+    idle_time=$(cat $IDLE_TIME_FILE)
+  done
+  idle_time=$(cat $IDLE_TIME_FILE)
+  rm $IDLE_TIME_FILE
+  wait_for_process $IDLE_PID
+
+  if ! approx "$idle_time" 6.2; then
+    echo "idle time was $idle_time"
+    return 1
+  fi
 }
 
 ###########################################
@@ -418,7 +485,21 @@ while read -r line; do
     TESTS+=("$function_name")
 done <<< "$functions"
 
-if [ $# -gt 0 ]; then
+length=${#1}
+last_character=${1:length-1:1}
+
+# if $1 ends with *, get all tests that start with prefix
+if [[ "$last_character" == "*" ]]; then
+  trimmed=${1%?}
+  NEW_TESTS=()
+  for test in ${TESTS[@]}; do
+    if [[ $test == $trimmed* ]]; then
+      NEW_TESTS+=("$test")
+    fi
+  done
+  echo "running only tests: ${NEW_TESTS[@]}"
+  TESTS=("${NEW_TESTS[@]}")
+elif [ $# -gt 0 ]; then
   TESTS=("$@")
 fi
 
