@@ -9,6 +9,7 @@ IDLE_TIME_FILE="/tmp/total_idle_time"
 
 mock() {
   cp test/command_mock.sh $1_mock
+  chmod +x $1_mock
 }
 
 clean_mock() {
@@ -27,7 +28,7 @@ clean_fixtures() {
   return
 }
 
-MOCKS=('idle' 'focus' 'sleep' 'afplay' 'gdate' 'idle_sys')
+MOCKS=('idle' 'focus' 'sleep' 'afplay' 'gdate' 'idle_sys' 'chrome-cli')
 
 
 fixtures() {
@@ -51,7 +52,9 @@ wait_for_num_calls() {
   mock_script=$2
   mock_args_file=".last_$mock_script"_args
   while [[ $(num_lines $mock_args_file) -lt "$call_count" ]]; do
-    sleep 0.01
+    echo "Waiting for $call_count calls to $mock_script"
+    echo "Current calls: $(num_lines $mock_args_file)"
+    sleep 1
   done
 }
 
@@ -74,6 +77,36 @@ default_returns() {
   on_any_call 'echo "Terminal"' focus_mock
   on_any_call ' if [[ "$1" == "+%s%3N" ]]; then echo "1000"; fi' gdate_mock
   on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
+  resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
+}
+
+tab_changes() {
+  focus_ms=$(echo "3000 * 1000" | bc)
+  begin_focus=1000
+  end_focus=$(echo "$begin_focus + $focus_ms" | bc)
+  end_focus2=$(echo "$begin_focus + (2 * $focus_ms)" | bc)
+  end_run=$(echo "$end_focus2 + 1001" | bc)
+
+  resp_on_call_count 1 'if [[ "$1" == "+%s%3N" ]]; then echo "'$begin_focus'"; fi' gdate_mock
+  resp_on_call_count 2 'if [[ "$1" == "+%s%3N" ]]; then echo "'$begin_focus'"; fi' gdate_mock
+  resp_on_call_count 3 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus'"; fi' gdate_mock
+  resp_on_call_count 4 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_focus2'"; fi' gdate_mock
+  resp_on_call_count 5 'if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
+  on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
+  resp_on_call_count_gte 6 ' if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
+
+
+  json_response='{"url":"https://www.google.com/","active":true}'
+  resp_on_call_count 1 "echo '$json_response'" chrome-cli_mock
+  json_response='{"url":"https://www.google.com/","active":true}'
+  resp_on_call_count 2  "echo '$json_response'" chrome-cli_mock
+  json_response='{"url":"https://www.google.com/","active":true}'
+  resp_on_call_count_gte 3  "echo '$json_response'  " chrome-cli_mock
+  
+  resp_on_call_count 1 'echo "Google Chrome || search"' focus_mock
+  resp_on_call_count 2 'echo "Google Chrome || foo"' focus_mock
+  resp_on_call_count_gte 3 'echo "Google Chrome || search"' focus_mock
+  resp_on_call_count 4 'echo "Terminal"' focus_mock
   
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
 }
@@ -85,14 +118,17 @@ poor_focus() {
   on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
   resp_on_call_count_gte 2 ' if [[ "$1" == "+%s%3N" ]]; then let "next_focus = '$begin_focus' + ($call_count * '$focus_incr')"; echo "$next_focus"; fi' gdate_mock
 
-  resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 1 'echo "Google Chrome' focus_mock
   resp_on_call_count 2 'echo "Terminal"' focus_mock
-  resp_on_call_count 3 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 3 'echo "Google Chrome' focus_mock
   resp_on_call_count 4 'echo "Terminal"' focus_mock
-  resp_on_call_count 5 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 5 'echo "Google Chrome' focus_mock
   resp_on_call_count 6 'echo "Terminal"' focus_mock
   
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
+  
+  json_response='{"url":"https://www.google.com/","active":true}'
+  resp_on_call_count_gte 1 "echo '$json_response'" chrome-cli_mock
 }
 
 single_focus_at_length() {
@@ -106,11 +142,15 @@ single_focus_at_length() {
   on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
   resp_on_call_count_gte 4 ' if [[ "$1" == "+%s%3N" ]]; then echo "'$end_run'"; fi' gdate_mock
 
-  resp_on_call_count 1 'echo "Google Chrome || https://www.google.com/"' focus_mock
+  resp_on_call_count 1 'echo "Google Chrome"' focus_mock
   resp_on_call_count 2 'echo "Terminal"' focus_mock
-  resp_on_call_count_gte 3 'echo "Youdontwannaknow"' focus_mock
+  resp_on_call_count 3 'echo "Cat Videos"' focus_mock
+  resp_on_call_count_gte 4 'echo "Youdontwannaknow"' focus_mock
   
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
+  
+  json_response='{"url":"https://www.google.com/","active":true}'
+  resp_on_call_count_gte 1 "echo '$json_response'" chrome-cli_mock
 }
 
 
@@ -136,6 +176,9 @@ single_focus_all_idle() {
   resp_on_call_count_gte 3 'echo "Youdontwannaknow"' focus_mock
  
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
+  
+  json_response='{"url":"https://www.google.com/","active":true}'
+  resp_on_call_count_gte 1 "echo '$json_response'" chrome-cli_mock
 }
 
 
@@ -158,6 +201,9 @@ two_apps_focused_at_length() {
   resp_on_call_count_gte 3 'echo "Youdontwannaknow"' focus_mock
   
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
+  
+  json_response='{"url":"https://www.google.com/","active":true}'
+  resp_on_call_count_gte 1 "echo '$json_response'" chrome-cli_mock
 }
 
 
@@ -209,6 +255,14 @@ test_attend_produces_output() {
   else
     return 1
   fi
+}
+
+test_attend_uses_chrome_tab_hostname() {
+  tab_changes
+
+  ./attend.sh start
+  ./attend.sh stop
+  cat $OUTPUT_FILE | grep -q "Google Chrome || www.google.com"
 }
 
 test_attend_keeps_output() {
@@ -291,7 +345,8 @@ test_attend_tracks_longest_app() {
   ./attend.sh stop
   longest_app=$(get_stat "Most focused app")
   echo "longest_app: $longest_app"
-  if [[ $longest_app != "Google Chrome || https://www.google.com/ " ]]; then
+  focus=$($GET_FOCUS)
+  if [[ $longest_app != "Google Chrome || www.google.com " ]]; then
     return 1
   fi
 }
@@ -531,6 +586,7 @@ test_idle_accumulates_but_resets() {
   fi
 }
 
+
 ###########################################
 # Run all functions that start with "test_"
 functions=$(declare -F | grep "^declare -f test_")
@@ -560,6 +616,7 @@ fi
 
 for test in ${TESTS[@]}; do
   fixtures
+  echo "STARTING $test"
   $test
   success=$?
   clean_fixtures

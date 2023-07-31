@@ -8,7 +8,6 @@ idle_call() {
 
 focus_call() {
   focus=$(osascript "$SCRIPT_DIR"/focusedapp.scpt 2> /dev/null)
-  focus=$(focus_name "$focus")
   echo "$focus"
 }
 
@@ -22,6 +21,7 @@ SLEEP=sleep
 AFPLAY=afplay_call
 GDATE=gdate
 IDLE=idle_call
+CHROME_CLI=chrome-cli
 
 if [[ -f 'idle_mock' ]]; then
   LOG_FILE="/tmp/attend_log.txt"
@@ -33,6 +33,7 @@ if [[ -f 'idle_mock' ]]; then
   SLEEP="./sleep_mock"
   AFPLAY="./afplay_mock"
   GDATE="./gdate_mock"
+  CHROME_CLI="./chrome-cli_mock"
 else
   LOG_FILE="$HOME/.attend_log.txt"
   OUTPUT_FILE="$HOME/.attend_worklog.txt"
@@ -61,6 +62,7 @@ exit_attend() {
 # probable shouldn't count as a focus change
 app_tabs_change_focus() {
   app_name=$1
+  log "Checking app:$app_name<"
   case $app_name in
     "Google Chrome")
       return 0
@@ -71,9 +73,24 @@ app_tabs_change_focus() {
   esac
 }
 
+tab_name() {
+  which $CHROME_CLI > /dev/null
+  if [ $? -eq 0 ]; then
+    # Get host name
+    tab_name=$(OUTPUT_FORMAT='json' $CHROME_CLI info | jq '.url' | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+    log "tab_name:$tab_name"
+    echo "$tab_name"
+    return 0
+  else
+    log "chrome-cli not found"
+    return 1
+  fi 
+}
+
 
 focus_name() {
-  window_title=$1
+  window_title=$($GET_FOCUS)
+  log "Window Title:$window_title"
 
   # Get whats before and after ||
   app_name=${window_title%||*}
@@ -82,12 +99,16 @@ focus_name() {
 
   app_tabs_change_focus "$app_name"
   if [ $? -eq 0 ]; then
-    echo "$window_title"
-    return 0
+    tab_name=$(tab_name)
+    if [ $? -eq 0 ]; then
+      echo "$app_name || $tab_name"
+    else
+      echo "$window_title"
+    fi
+  else
+    echo "$app_name"
   fi
 
-  echo "$app_name"
-  return 0
 }
 
 
@@ -352,14 +373,14 @@ track_focus() {
   LAST_IDLE=$(cat $IDLE_TIME_FILE)
   log "IDLE READY! $LAST_IDLE"
 
-  lastfocus=$($GET_FOCUS)
+  lastfocus=$(focus_name)
   log "Work session started at $work_begin_ts -- $work_begin -- $lastfocus"
 
   # loop forever, sleep for 1 second
   while [[ -f $PID_FILE ]] ; do
       $SLEEP 0.1
       # get the focused app
-      focus=$($GET_FOCUS)
+      focus=$(focus_name)
       # if the focused app is not the same as the last focused app
       if [ "$focus" != "$lastfocus" ]; then
           log "FOCUS SWITCH $lastfocus -> $focus"
@@ -377,7 +398,7 @@ track_focus() {
       fi
   done
   log "track_focus main loop DONE"
-  focus=$($GET_FOCUS)
+  focus=$(focus_name)
   
   log "killing idle process at $IDLE_PID"
   rm -f $IDLE_TIME_FILE
