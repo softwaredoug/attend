@@ -16,23 +16,23 @@ Work work work... sometime later
 ```
 attend stop
 
-Work session done!
-   Review the document
 ----------------------------------------
-...All scores in effective seconds...
-   the more time you spend on a task, the more the seconds accumulate!...
-----------------------------------------
-You started working at 2023-07-25T16:49:04
-Work session length: 15120 seconds
+Work session:
+  Unnamed Session
 ----
-Average focus score: 1500.49887665797257113314
-Max focus score: 3000.99775331594514226628
-Most focused app: Google Chrome || https://docs.google.com
-Num task switches: 45
-Total idle time: 12
+You started working at 2023-01-01T00:00
+Session lasted mins: 50.02
+Idle mins: 0.00
+ 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+ New high perc. for > 5 min session! -- 8.00%
 ----
-🎉🎉🎉🎉🎉🎉🎉🎉🎉
-New high max score! -- 3000.99775331594514226628
+Effective focus %: 80.00
+Total effective mins: 40.01
+Num task switches: 0
+----
+Most focused app: Google Chrome || docs.google.com
+Focused mins: 28.00
+---------------------------------------
 ```
 
 ## Install
