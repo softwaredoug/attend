@@ -1,5 +1,8 @@
 #!/bin/bash
 
+
+echo "LOGGING ENABLED"
+
 log() {
   echo "$1" > /dev/tty
 }

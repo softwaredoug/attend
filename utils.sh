@@ -1,5 +1,6 @@
 #!/bin/bash
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 . "$SCRIPT_DIR"/log.sh
 
 compute() {
@@ -87,4 +88,21 @@ num_lines() {
   else
     echo 0
   fi
+}
+
+confirm() {
+    read -r -p "${1:-Are you sure? [Y/n]} " response
+    case "$response" in
+        [yY][eE][sS]|[yY]|"")
+            true  # Return true (0) if "Yes" or empty input
+            ;;
+        [nN][oO]|[nN])
+            false  # Return false (1) if "No"
+            ;;
+        *)
+            # Invalid input; prompt again
+            echo "Invalid input. Please enter Y or N."
+            confirm "$1"
+            ;;
+    esac
 }

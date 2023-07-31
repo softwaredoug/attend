@@ -43,8 +43,8 @@ TIMESTAMP_PATTERN="+%Y-%m-%dT%H:%M:%S"
 MS_PATTERN="+%s%3N"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
-. "$SCRIPT_DIR"/log.sh
 . "$SCRIPT_DIR"/utils.sh
+. "$SCRIPT_DIR"/log.sh
 
 log "LOG START"
 
@@ -168,27 +168,55 @@ update_scores() {
   fi
 }
 
-report() {
+output_log_line() {
   work_begin="$1"
   work_begin_ts="$2"
   session_name="$3"
   work_end=$($GDATE $MS_PATTERN)
   work_end_ts=$($GDATE $TIMESTAMP_PATTERN)
   
-  log "killing idle process at $IDLE_PID"
-  rm -f $IDLE_TIME_FILE
-  wait_for_process $IDLE_PID 'idle'
-  log "idle killed"
-
+  log "Append to log file -- $LOG_FILE"
+  if [[ ! -f $LOG_FILE ]]; then
+    touch $LOG_FILE
+  fi
+  
   session_length_secs=$(compute "($work_end - $work_begin) / 1000")
   if check "$session_length_secs == 0"; then
     session_length_secs=1
   fi
   session_length_no_idle=$(compute "$session_length_secs - $TOT_IDLE")
+  avg_score=$(compute "$TOT_SCORE / $NUM_SWITCHES")
+  MAX_SCORE=$(printf "%.2f" $MAX_SCORE)
+  TOT_SCORE=$(printf "%.2f" $TOT_SCORE)
+  
+  session_name_no_ws=$(echo "$session_name" | tr -s '[:space:]' '_')
+  max_app_no_ws=$(echo "$MAX_APP" | tr -s '[:space:]' '_')
+
+  if [[ "$session_name_no_ws" == "" ]]; then
+    session_name_no_ws="Unnamed_Session"
+  fi
+  if [[ "$session_name_no_ws" == "_" ]]; then
+    session_name_no_ws="Unnamed_Session"
+  fi
+
+  echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE $max_app_no_ws $session_name_no_ws" >> $LOG_FILE
+
+}
+
+
+report() {
+  line="$@"
+
+  read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
+
+  # Replace underscores with spaces
+  ln_max_app=$(echo "$ln_max_app_no_ws" | tr '_' ' ')
+  ln_session_name=$(echo "$ln_session_name_no_ws" | tr '_' ' ')
+
   output ""
   output "Work session done:"
-  if [[ "$session_name" != "" ]]; then
-    output "  $session_name"
+  if [[ "$ln_session_name_no_ws" != "" ]]; then
+    output "  $ln_session_name"
   fi
   output "----------------------------------------"
   output "...All scores in effective seconds..."
@@ -199,21 +227,21 @@ report() {
   highest_max=$(sort -k8 -n -r $LOG_FILE 2> /dev/null | head -n 1 | awk '{print $8}')
   # If the current score is higher than the highest score
 
-  avg_score=$(compute "$TOT_SCORE / $NUM_SWITCHES")
-  log ">>> TOT_SCORE: $TOT_SCORE"
-  log ">>> TOT_IDLE: $TOT_IDLE"
-  log ">>> session_length_secs: $session_length_secs"
-  log ">>> session_length_no_idle: $session_length_no_idle"
-  log ">>> just ratio: $(compute "$TOT_SCORE / $session_length_no_idle")"
-  work_percentage=$(compute "100 * ($TOT_SCORE / $session_length_no_idle)")
+  ln_session_length_no_idle=$(compute "$ln_session_length_secs - $ln_TOT_IDLE")
+  log ">>> TOT_SCORE: $ln_TOT_SCORE"
+  log ">>> TOT_IDLE: $ln_TOT_IDLE"
+  log ">>> session_length_secs: $ln_session_length_secs"
+  log ">>> session_length_no_idle: $ln_session_length_no_idle"
+  log ">>> just ratio: $(compute "$ln_TOT_SCORE / $ln_session_length_no_idle")"
+  work_percentage=$(compute "100 * ($ln_TOT_SCORE / $ln_session_length_no_idle)")
   work_percentage=$(printf "%.2f" $work_percentage)
-  session_length_mins=$(compute "$session_length_secs / 60.0")
-  session_length_mins=$(printf "%.2f" $session_length_mins)
-  session_length_no_idle_mins=$(compute "$session_length_no_idle / 60.0")
-  session_length_no_idle_mins=$(printf "%.2f" $session_length_no_idle_mins)
-  output "You started working at $work_begin_ts"
-  output "Work session length: $session_length_mins mins"
-  output "Work session without idle: $session_length_no_idle_mins mins"
+  ln_session_length_mins=$(compute "$ln_session_length_secs / 60.0")
+  ln_session_length_mins=$(printf "%.2f" $ln_session_length_mins)
+  ln_session_length_no_idle_mins=$(compute "$ln_session_length_no_idle / 60.0")
+  ln_session_length_no_idle_mins=$(printf "%.2f" $ln_session_length_no_idle_mins)
+  output "You started working at $ln_work_begin_ts"
+  output "Work session length: $ln_session_length_mins mins"
+  output "Work session without idle: $ln_session_length_no_idle_mins mins"
   output "----"
   output "Effective focus %: $work_percentage"
   
@@ -228,6 +256,7 @@ report() {
     # Loop lines in LOG_FILE to compute work_percentage per line
     while IFS= read -r line; do
       # Get the work ratio
+      log "checking line: $line"
       this_session_length_secs=$(echo $line | awk '{print $4}')
       this_idle_time=$(echo $line | awk '{print $5}')
       # Get the session length
@@ -256,7 +285,7 @@ report() {
 
   idx=0
   for min_length in "${reporting_minutes[@]}"; do
-    if check "$session_length_mins >= $min_length"; then
+    if check "$ln_session_length_mins >= $min_length"; then
       if check "$work_percentage > ${max_percentages[$idx]}"; then
         output " 🎉🎉🎉🎉🎉🎉🎉🎉🎉"
         output " New high score for $min_length min session! -- $(printf %.2f $work_percentage)"
@@ -265,19 +294,18 @@ report() {
     idx=$((idx+1))
   done
 
-  TOT_SCORE=$(printf "%.2f" $TOT_SCORE)
-  output "Total effective seconds: $TOT_SCORE"
+  output "Total effective seconds: $ln_TOT_SCORE"
 
-  TOT_IDLE_MINS=$(compute "$TOT_IDLE / 60.0")
+  TOT_IDLE_MINS=$(compute "$ln_TOT_IDLE / 60.0")
   TOT_IDLE_MINS=$(printf "%.2f" $TOT_IDLE_MINS)
   output "Total idle time: $TOT_IDLE_MINS mins"
 
-  MAX_SCORE=$(printf "%.2f" $MAX_SCORE)
-  output "Max focus score: $MAX_SCORE"
+  MAX_SCORE=$(printf "%.2f" $ln_MAX_SCORE)
+  output "Max focus score: $ln_MAX_SCORE"
 
   output "----"
-  output "Most focused app: $MAX_APP"
-  output "Num task switches: $NUM_SWITCHES"
+  output "Most focused app: $ln_max_app"
+  output "Num task switches: $ln_NUM_SWITCHES"
 
   output "----"
   output "Highest     max score: $highest_max"
@@ -288,24 +316,18 @@ report() {
     highest_max=0
   fi
   
-  if check "$MAX_SCORE > $highest_max"; then
+  if check "$ln_MAX_SCORE > $highest_max"; then
     output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
     output "New high max score! -- $(printf %.2f $MAX_SCORE) "
     $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
-  log "Append to log file -- $LOG_FILE"
-  if [[ ! -f $LOG_FILE ]]; then
-    touch $LOG_FILE
-  fi
   
-  session_name_no_ws=$(echo "$session_name" | tr -s '[:space:]' '_')
-  max_app_no_ws=$(echo "$MAX_APP" | tr -s '[:space:]' '_')
+  session_name_no_ws=$(echo "$ln_session_name" | tr -s '[:space:]' '_')
+  max_app_no_ws=$(echo "$ln_MAX_APP" | tr -s '[:space:]' '_')
 
-  log "work_end_ts:$work_end_ts work_begin_ts:$work_begin_ts work_end:$work_end"
-  echo "$work_end_ts $work_begin_ts $work_end $session_length_secs $TOT_IDLE $NUM_SWITCHES $TOT_SCORE $avg_score $MAX_SCORE $max_app_no_ws $session_name_no_ws" >> $LOG_FILE
+  log "work_end_ts:$ln_work_end_ts work_begin_ts:$ln_work_begin_ts work_end:$ln_work_end"
   tail -n $NUM_LINES $OUTPUT_FILE
   echo "View full work log at $OUTPUT_FILE"
-  echo "Reset with rm $OUTPUT_FILE"
   log "REPORT DONE... quitting"
   exit 0
 }
@@ -356,13 +378,22 @@ track_focus() {
   done
   log "track_focus main loop DONE"
   focus=$($GET_FOCUS)
+  
+  log "killing idle process at $IDLE_PID"
+  rm -f $IDLE_TIME_FILE
+  wait_for_process $IDLE_PID 'idle'
+  log "idle killed"
+  
   update_scores "$lastfocus" "$work_begin"
-  report "$work_begin" "$work_begin_ts" "$session_name"
+  output_log_line "$work_begin" "$work_begin_ts" "$session_name"
+  last_line=$(tail -n 1 $LOG_FILE)
+  report "$last_line"
 }
 
 # On Ctrl+C, print the score and exit
 
-if [[ "$1" == "start" ]]; then
+
+start() {
   if [[ -f $PID_FILE ]]; then
     echo "Focus already running"
     exit 1
@@ -379,7 +410,9 @@ if [[ "$1" == "start" ]]; then
     echo "Waiting on attend to start..."
     $SLEEP 0.1
   done
-elif [[ "$1" == "stop" ]]; then
+}
+
+stop() {
   if [[ -f $PID_FILE ]]; then
     pid=$(cat $PID_FILE)
     echo "Stopping attend at pid $pid"
@@ -390,9 +423,39 @@ elif [[ "$1" == "stop" ]]; then
     echo "No attend process running"
     exit 1
   fi
-else
+}
+
+help() {
   echo "Usage: attend [start|stop]"
+  echo ""
   echo "  start: start tracking your focus"
+  echo "  start \"Session Name\": start tracking your focus with a custom session name"
   echo "  stop: stop your work session"
-  exit 1
+  return 1
+}
+
+reset() {
+  if [[ -f $PID_FILE ]]; then
+    echo "Please exit the current session before resetting with:"
+    echo ""
+    echo "  attend stop"
+    return 1
+  fi
+  # Confirm we want to reset
+  confirm "Resetting will delete all your work logs. Are you sure you want to reset?" || return 1
+  echo ""
+  echo "Resetting attend..."
+  rm -f $OUTPUT_FILE
+  rm -f $LOG_FILE
+  echo "Done"
+}
+
+if [[ "$1" == "start" ]]; then
+  start "$@"
+elif [[ "$1" == "stop" ]]; then
+  stop "$@"
+elif [[ "$1" == "reset" ]]; then
+  reset "$@"
+else
+  help
 fi

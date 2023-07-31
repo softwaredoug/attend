@@ -291,7 +291,7 @@ test_attend_tracks_longest_app() {
   ./attend.sh stop
   longest_app=$(get_stat "Most focused app")
   echo "longest_app: $longest_app"
-  if [[ $longest_app != "Google Chrome || https://www.google.com/" ]]; then
+  if [[ $longest_app != "Google Chrome || https://www.google.com/ " ]]; then
     return 1
   fi
 }
@@ -414,6 +414,14 @@ test_prints_work_session_name() {
   ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "my task"
   return $?
+}
+
+test_logging_disabled() {
+  single_focus_at_length 3000
+  ./attend.sh stop | grep -q "LOGGING ENABLED"
+  if [[ $? -ne 1 ]]; then
+    return 1
+  fi
 }
 
 test_logs_work_session_name() {
