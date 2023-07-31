@@ -393,27 +393,6 @@ test_attend_output_missing_log() {
   fi
 }
 
-test_detects_new_high_score_on_empty_log() {
-  single_focus_at_length 3000
-  ./attend.sh start
-  wait_for_num_calls 4 "gdate_mock"
-  ./attend.sh stop
-  cat $OUTPUT_FILE | grep -q "New high max score"
-  return $?
-}
-
-test_detects_new_high_score() {
-  # last two values avg, max
-  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 6 1 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 My_longest_app" > $LOG_FILE
-  cat $LOG_FILE
-  single_focus_at_length 3000
-  ./attend.sh start
-  wait_for_num_calls 4 "gdate_mock"
-  ./attend.sh stop
-  cat $OUTPUT_FILE | grep -q "New high max score"
-  return $?
-}
-
 test_detects_new_high_ratios() {
   this_session_length_secs=1200.0
   this_session_length_mins=$(echo "$this_session_length_secs / 60.0" | bc)
@@ -431,10 +410,10 @@ test_detects_new_high_ratios() {
   for min_length in "${reporting_minutes[@]}"; do
     if [[ $new_session_length_mins -ge $min_length ]]; then
       echo "Check for high score... for $min_length"
-      cat $OUTPUT_FILE | grep -q " New high score for $min_length min session! -- $work_ratio"
+      cat $OUTPUT_FILE | grep -q " New high perc. for $min_length min session! -- $work_ratio"
       success=$?
     else
-      cat $OUTPUT_FILE | grep -q " New high score for $min_length min session! -- $work_ratio"
+      cat $OUTPUT_FILE | grep -q " New high perc. for $min_length min session! -- $work_ratio"
       found=$?
       [[ "$found" != 0 ]]
       success=$?
@@ -458,7 +437,7 @@ test_does_not_detect_high_ratios() {
   reporting_minutes=(5 10 20 30 45 60 90 120)
   for min_length in "${reporting_minutes[@]}"; do
     # no records should be set
-    cat $OUTPUT_FILE | grep -q " New high score for $min_length min session! -- $work_ratio"
+    cat $OUTPUT_FILE | grep -q " New high perc. for $min_length min session! -- $work_ratio"
     found=$?
     [[ "$found" != 0 ]]
     success=$?

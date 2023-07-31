@@ -276,14 +276,19 @@ report() {
   # Compute records for each reporting minute segment from the past work sessions
   if [[ -f "$LOG_FILE" ]]; then
     # Loop lines in LOG_FILE to compute work_percentage per line
-    while IFS= read -r line; do
+    while IFS= read -r this_line; do
       # Get the work ratio
-      log "checking line: $line"
-      this_session_length_secs=$(echo $line | awk '{print $4}')
-      this_idle_time=$(echo $line | awk '{print $5}')
+      log "checking line: $this_line"
+      this_work_begin_ts=$(echo $this_line | awk '{print $2}')
+      if [[ "$this_work_begin_ts" == "$ln_work_begin_ts" ]]; then
+        echo "Skipping identical line"
+        continue
+      fi
+      this_session_length_secs=$(echo $this_line | awk '{print $4}')
+      this_idle_time=$(echo $this_line | awk '{print $5}')
       # Get the session length
       this_session_length_no_idle=$(compute "$this_session_length_secs - $this_idle_time")
-      this_score=$(echo $line | awk '{print $7}')
+      this_score=$(echo $this_line | awk '{print $7}')
       this_percentage=$(compute "100 * ($this_score / $this_session_length_no_idle)")
       this_session_length_mins=$(compute "$this_session_length_secs / 60.0")
 
@@ -304,19 +309,21 @@ report() {
   else
     log "No attend log file found at $LOG_FILE"
   fi
-
+  tada=0
   idx=0
   for min_length in "${reporting_minutes[@]}"; do
     if check "$ln_session_length_mins >= $min_length"; then
       if check "$work_percentage > ${max_percentages[$idx]}"; then
         output " 🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-        output " New high score for $min_length min session! -- $(printf %.2f $work_percentage)"
+        output " New high perc. for $min_length min session! -- $(printf %.2f $work_percentage)%"
+        tada=1
       fi
     fi
     idx=$((idx+1))
   done
 
-  output "Total effective seconds: $ln_TOT_SCORE"
+  total_effective_mins=$(compute "$ln_TOT_SCORE / 60.0")
+  output "Total effective mins: $total_effective_mins mins"
 
   TOT_IDLE_MINS=$(compute "$ln_TOT_IDLE / 60.0")
   TOT_IDLE_MINS=$(printf "%.2f" $TOT_IDLE_MINS)
@@ -340,7 +347,11 @@ report() {
   
   if check "$ln_MAX_SCORE > $highest_max"; then
     output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-    output "New high max score! -- $(printf %.2f $MAX_SCORE) "
+    output "New high max effective mins! -- $(printf %.2f $MAX_SCORE) "
+    tada=1
+  fi
+
+  if [[ "$tada" == "1" ]]; then
     $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
   
