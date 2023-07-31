@@ -303,7 +303,8 @@ test_attend_long_focus_scores_near_actual_time() {
   single_focus_at_length 3000
   ./attend.sh start
   ./attend.sh stop
-  max_score=$(get_stat "Max focus score")
+  max_score=$(get_stat "Focused mins")
+  max_score=$(compute "$max_score * 60")
   check_gt $max_score 2900
   if [[ $? -ne 0 ]]; then
     echo "gt max_score: $max_score > 2900"
@@ -321,7 +322,7 @@ test_attend_long_focus_all_idle() {
   ./attend.sh start
   sleep 1
   ./attend.sh stop
-  max_score=$(get_stat "Max focus score")
+  max_score=$(get_stat "Focused mins")
 
   if ! approx $max_score 0 0.3; then
     echo "max_score: $max_score != 0"
@@ -334,7 +335,8 @@ test_attend_two_long_focus_scores_near_actual_time() {
   expected_score=6000
   ./attend.sh start
   ./attend.sh stop
-  max_score=$(get_stat "Max focus score")
+  max_score=$(get_stat "Focused mins")
+  max_score=$(compute "$max_score * 60")
   check_gt $max_score $(echo "$expected_score - 100" | bc)
   if [[ $? -ne 0 ]]; then
     echo "gt max_score: $max_score > 2900"
@@ -374,7 +376,7 @@ test_attend_short_focus_scores_a_lot_less_than_time() {
   ./attend.sh start
   wait_for_num_calls 4 "gdate_mock"
   ./attend.sh stop
-  max_score=$(get_stat "Max focus score")
+  max_score=$(get_stat "Focused mins")
   check_lt "$max_score" "1"
   if [[ $? -ne 0 ]]; then
     return 1

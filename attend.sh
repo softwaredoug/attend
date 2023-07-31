@@ -236,14 +236,12 @@ report() {
   ln_session_name=$(echo "$ln_session_name_no_ws" | tr '_' ' ')
 
   output ""
-  output "Work session done:"
+  output "----------------------------------------"
+  output "Work session:"
   if [[ "$ln_session_name_no_ws" != "" ]]; then
     output "  $ln_session_name"
   fi
-  output "----------------------------------------"
-  output "...All scores in effective seconds..."
-  output "   the more time you spend on a task, the more the seconds accumulate!..."
-  output "----------------------------------------"
+  output "----"
   # Check the highest score
   highest_avg=$(sort -k7 -n -r $LOG_FILE 2> /dev/null | head -n 1 | awk '{print $7}')
   highest_max=$(sort -k8 -n -r $LOG_FILE 2> /dev/null | head -n 1 | awk '{print $8}')
@@ -262,10 +260,10 @@ report() {
   ln_session_length_no_idle_mins=$(compute "$ln_session_length_no_idle / 60.0")
   ln_session_length_no_idle_mins=$(printf "%.2f" $ln_session_length_no_idle_mins)
   output "You started working at $ln_work_begin_ts"
-  output "Work session length: $ln_session_length_mins mins"
-  output "Work session without idle: $ln_session_length_no_idle_mins mins"
-  output "----"
-  output "Effective focus %: $work_percentage"
+  output "Session lasted mins: $ln_session_length_mins"
+  TOT_IDLE_MINS=$(compute "$ln_TOT_IDLE / 60.0")
+  TOT_IDLE_MINS=$(printf "%.2f" $TOT_IDLE_MINS)
+  output "Idle mins: $TOT_IDLE_MINS"
   
   assert "$work_percentage <= 100.0"
   assert "$work_percentage >= 0.0" 
@@ -281,7 +279,7 @@ report() {
       log "checking line: $this_line"
       this_work_begin_ts=$(echo $this_line | awk '{print $2}')
       if [[ "$this_work_begin_ts" == "$ln_work_begin_ts" ]]; then
-        echo "Skipping identical line"
+        log "Skipping identical line $this_line"
         continue
       fi
       this_session_length_secs=$(echo $this_line | awk '{print $4}')
@@ -322,35 +320,26 @@ report() {
     idx=$((idx+1))
   done
 
+  output "----"
+  output "Effective focus %: $work_percentage"
   total_effective_mins=$(compute "$ln_TOT_SCORE / 60.0")
-  output "Total effective mins: $total_effective_mins mins"
+  total_effective_mins=$(printf "%.2f" $total_effective_mins)
+  output "Total effective mins: $total_effective_mins"
 
-  TOT_IDLE_MINS=$(compute "$ln_TOT_IDLE / 60.0")
-  TOT_IDLE_MINS=$(printf "%.2f" $TOT_IDLE_MINS)
-  output "Total idle time: $TOT_IDLE_MINS mins"
+  output "Num task switches: $ln_NUM_SWITCHES"
 
-  MAX_SCORE=$(printf "%.2f" $ln_MAX_SCORE)
-  output "Max focus score: $ln_MAX_SCORE"
+  max_score_mins=$(compute "$ln_MAX_SCORE / 60.0")
+  max_score_mins=$(printf "%.2f" $max_score_mins)
 
   output "----"
   output "Most focused app: $ln_max_app"
-  output "Num task switches: $ln_NUM_SWITCHES"
-
-  output "----"
-  output "Highest     max score: $highest_max"
+  output "Focused mins: $max_score_mins"
+  output "----------------------------------------"
 
   if [ ! -f $LOG_FILE ]; then
     touch $LOG_FILE
-    highest_avg=0
-    highest_max=0
   fi
   
-  if check "$ln_MAX_SCORE > $highest_max"; then
-    output "🎉🎉🎉🎉🎉🎉🎉🎉🎉"
-    output "New high max effective mins! -- $(printf %.2f $MAX_SCORE) "
-    tada=1
-  fi
-
   if [[ "$tada" == "1" ]]; then
     $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
@@ -360,7 +349,6 @@ report() {
 
   log "work_end_ts:$ln_work_end_ts work_begin_ts:$ln_work_begin_ts work_end:$ln_work_end"
   tail -n $NUM_LINES $OUTPUT_FILE
-  echo "View full work log at $OUTPUT_FILE"
   log "REPORT DONE... quitting"
   exit 0
 }
