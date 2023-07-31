@@ -116,7 +116,7 @@ focus_name() {
 # session
 TOT_SCORE=0
 MAX_SCORE=0
-NUM_SWITCHES=1
+NUM_SWITCHES=0
 LAST_TIME=0
 LAST_IDLE=0
 TOT_IDLE=0
@@ -160,6 +160,7 @@ update_scores() {
   let "time_diff = $time - $LAST_TIME"
   time_no_idle=$(compute "$time_diff - $this_idle_ms")
   time_diff_secs=$(compute "$time_no_idle / 1000")
+  log "Update Scores:"
   log "LAST_TIME-$LAST_TIME time:$time time_diff:$time_diff"
   log "    IDLES-idle:$idle this_idle:$this_idle"
   log "     TIME_DIFF:$time_diff"
@@ -178,7 +179,6 @@ update_scores() {
     assert "$TOT_SCORE <= $session_time_secs"
     assert "$TOT_SCORE <= $session_time_secs_no_idle"
 
-    let "NUM_SWITCHES = $NUM_SWITCHES + 1"
     if check "$this_score > $MAX_SCORE"; then
       MAX_SCORE=$this_score
       MAX_APP=$1
@@ -206,7 +206,8 @@ output_log_line() {
     session_length_secs=1
   fi
   session_length_no_idle=$(compute "$session_length_secs - $TOT_IDLE")
-  avg_score=$(compute "$TOT_SCORE / $NUM_SWITCHES")
+  num_apps_used=$(compute "$NUM_SWITCHES + 1")
+  avg_score=$(compute "$TOT_SCORE / $num_apps_used")
   MAX_SCORE=$(printf "%.2f" $MAX_SCORE)
   TOT_SCORE=$(printf "%.2f" $TOT_SCORE)
   
@@ -390,6 +391,7 @@ track_focus() {
           # get the current time in milliseconds
           if [ "$lastfocus" != "" ]; then
             update_scores "$lastfocus" "$work_begin"
+            let "NUM_SWITCHES = $NUM_SWITCHES + 1"
           else
             warn "Not updating focus switch because last_focus is empty"
           fi
@@ -400,12 +402,13 @@ track_focus() {
   log "track_focus main loop DONE"
   focus=$(focus_name)
   
+  update_scores "$lastfocus" "$work_begin"
+  
   log "killing idle process at $IDLE_PID"
   rm -f $IDLE_TIME_FILE
   wait_for_process $IDLE_PID 'idle'
   log "idle killed"
   
-  update_scores "$lastfocus" "$work_begin"
   output_log_line "$work_begin" "$work_begin_ts" "$session_name"
   last_line=$(tail -n 1 $LOG_FILE)
   report "$last_line"

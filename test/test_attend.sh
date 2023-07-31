@@ -75,7 +75,8 @@ on_any_call() {
 
 default_returns() {
   on_any_call 'echo "Terminal"' focus_mock
-  on_any_call ' if [[ "$1" == "+%s%3N" ]]; then echo "1000"; fi' gdate_mock
+  resp_on_call_count 1 ' if [[ "$1" == "+%s%3N" ]]; then echo "1000"; fi' gdate_mock
+  resp_on_call_count_gte 2 ' if [[ "$1" == "+%s%3N" ]]; then echo "2000"; fi' gdate_mock
   on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
 }
@@ -118,11 +119,11 @@ poor_focus() {
   on_any_call ' if [[ "$1" == "+%Y-%m-%dT%H:%M:%S" ]]; then echo "2018-01-01T00:00"; fi' gdate_mock
   resp_on_call_count_gte 2 ' if [[ "$1" == "+%s%3N" ]]; then let "next_focus = '$begin_focus' + ($call_count * '$focus_incr')"; echo "$next_focus"; fi' gdate_mock
 
-  resp_on_call_count 1 'echo "Google Chrome' focus_mock
+  resp_on_call_count 1 'echo "Google Chrome"' focus_mock
   resp_on_call_count 2 'echo "Terminal"' focus_mock
-  resp_on_call_count 3 'echo "Google Chrome' focus_mock
+  resp_on_call_count 3 'echo "Google Chrome"' focus_mock
   resp_on_call_count 4 'echo "Terminal"' focus_mock
-  resp_on_call_count 5 'echo "Google Chrome' focus_mock
+  resp_on_call_count 5 'echo "Google Chrome"' focus_mock
   resp_on_call_count 6 'echo "Terminal"' focus_mock
   
   resp_on_call_count_gte 1 "echo "0" > $IDLE_TIME_FILE" idle_mock
@@ -263,6 +264,23 @@ test_attend_uses_chrome_tab_hostname() {
   ./attend.sh start
   ./attend.sh stop
   cat $OUTPUT_FILE | grep -q "Google Chrome || www.google.com"
+}
+
+test_attend_only_one_app_has_max_app() {
+  default_returns
+
+  ./attend.sh start
+  ./attend.sh stop
+  cat $OUTPUT_FILE | grep -q "Terminal"
+}
+
+test_attend_only_one_app_has_no_switches_app() {
+  default_returns
+
+  ./attend.sh start
+  ./attend.sh stop
+  num_switches=$(get_stat "Num task switches")
+  check "$num_switches == 0"
 }
 
 test_attend_keeps_output() {
