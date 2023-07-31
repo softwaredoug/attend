@@ -24,7 +24,7 @@ You started working at 2023-01-01T00:00
 Session lasted mins: 50.02
 Idle mins: 0.00
  🎉🎉🎉🎉🎉🎉🎉🎉🎉
- New high perc. for > 5 min session! -- 8.00%
+ New high perc. for > 5 min session! -- 80.00%
 ----
 Effective focus %: 80.00
 Total effective mins: 40.01
