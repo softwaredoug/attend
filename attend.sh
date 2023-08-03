@@ -514,6 +514,10 @@ detailed() {
 
 year_report() {
   # Print one line per week
+  out_of="$1"
+  if [[ "$out_of" == "" ]]; then
+    out_of="max"
+  fi
 
   # First Sunday of this year, using gdate
   minutes_per_doy=()
@@ -545,12 +549,17 @@ year_report() {
   fi
 
   # Max minutes_per_doy
+
   max_minutes_per_doy=0
-  for i in "${minutes_per_doy[@]}"; do
-    if check "$i > $max_minutes_per_doy" ; then
-      max_minutes_per_doy=$i
-    fi
-  done
+  if [[ "$out_of" == "max" ]]; then
+    for i in "${minutes_per_doy[@]}"; do
+      if check "$i > $max_minutes_per_doy" ; then
+        max_minutes_per_doy=$i
+      fi
+    done
+  else
+    max_minutes_per_doy="$1"
+  fi
 
   # Take each relative to max
   for i in "${!minutes_per_doy[@]}"; do
@@ -562,7 +571,6 @@ year_report() {
   # subtract 2 months from data_start
 
   echo "Focus out of max since $(date -r $data_start)"
-  echo ""
   calendar $data_start ${minutes_per_doy[@]}
 }
 
@@ -575,7 +583,7 @@ elif [[ "$1" == "reset" ]]; then
 elif [[ "$1" == "worklog" ]]; then
   detailed "$2"
 elif [[ "$1" == "show" ]]; then
-  year_report
+  year_report "$2"
 else
   help
 fi

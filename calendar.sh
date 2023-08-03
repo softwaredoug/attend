@@ -47,10 +47,6 @@ calendar() {
   # Iterate every day of year up to range_end
   while [[ $start_ts -lt $range_end ]]; do
     # Get day of week
-    day_of_week=$(gdate -d "@$start_ts" +%u)
-    day_of_month=$(gdate -d "@$start_ts" +%d)
-    name_of_month=$(gdate -d "@$start_ts" +%B)
-    name_of_month_short=$(gdate -d "@$start_ts" +%b)
     start_ts=$((start_ts + 86400))
 
     if [[ $start_ts -lt $begin_display_ts ]]; then
@@ -60,29 +56,35 @@ calendar() {
     if [[ $start_ts -gt $now ]]; then
       break
     fi
+    
+    day_of_week=$(gdate -d "@$start_ts" +%u)
+    day_of_month=$(gdate -d "@$start_ts" +%d)
+    name_of_month=$(gdate -d "@$start_ts" +%B)
+    name_of_month_short=$(gdate -d "@$start_ts" +%b)
 
     # Header
     if [[ $first_line == true ]]; then
-      first_line=false
-      echo "    Su Mo Tu We Th Fr Sa"
-      echo -n "$name_of_month_short"
+      echo ""
+      echo "       Su Mo Tu We Th Fr Sa"
+      echo -n "$name_of_month_short $day_of_month"
     fi
 
 
     # Wrap on Sunday
     if [[ $day_of_week == "7" ]]; then
       echo ""
-      echo -n $day_of_month
-      echo -n "  "
+      echo -n "    $day_of_month"
+      echo -n " "
     fi
+    first_line=false
 
     # Wrap on first of month
     if [[ "$day_of_month" == "01" ]]; then
       # three spaces per day of week
       echo ""
-      echo -n "$name_of_month_short"
       echo ""
-      echo -n "01  "
+      echo "       Su Mo Tu We Th Fr Sa"
+      echo -n "$name_of_month_short 01 "
       for i in {1..6}; do
         if [[ $i -gt $day_of_week ]]; then
           break
@@ -100,12 +102,6 @@ calendar() {
     echo -n "$intensity$intensity$intensity"
   done
   echo
-
-  # Get day of week
-  # day_of_week=$(gdate -d "$start_ts" +%u)
-
-  # Get day of month
-  # day_of_month=$(gdate -d "$start_ts" +%d)
 }
 
 
