@@ -2,9 +2,36 @@
 
 [![Bash Tests](https://github.com/softwaredoug/focus/actions/workflows/test.yml/badge.svg)](https://github.com/softwaredoug/focus/actions/workflows/test.yml)
 
-Scores your work sessions based on how little you switch the main focus in OSX. 
+Start / stop work sessions and track your focus.
+
+```
+Focus since - Thu Jun  1 2023
+
+    Su Mo Tu We Th Fr Sa
+May         
+28              
+Jun
+01              ███      
+04  █████████▓▓▓▒▒▒▒▒▒   
+11     ▓▓▓▓▓▓███▒▒▒▓▓▓▒▒▒
+18     ░░░░░░░░░▓▓▓▓▓▓░░░
+25     ███      ██████
+Jul
+01                    ███
+02  ▓▓▓▒▒▒▒▒▒      ▓▓▓▓▓▓
+09  ███▒▒▒▓▓▓▒▒▒   ░░░░░░
+16  ░░░▓▓▓▓▓▓░░░   ███   
+23     █████████▓▓▓▒▒▒▒▒▒
+30        
+Aug
+01        ▓▓▓▓▓▓
+```
 
 More time in one app == higher score.
+
+
+## Usage 
+
 (also plays a bell anytime you switch your OSX task to remind you)
 
 ```
@@ -34,6 +61,21 @@ Most focused app: Google Chrome || docs.google.com
 Focused mins: 28.00
 ---------------------------------------
 ```
+
+### Get a calendar visualization
+
+(as in above)
+
+```
+attend show
+```
+
+### Get a detailed output of a date range
+
+```
+attend worklog week
+```
+
 
 ## Install
 
