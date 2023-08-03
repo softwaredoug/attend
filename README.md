@@ -5,6 +5,8 @@
 Start / stop work sessions and track your focus.
 
 ```
+$ attend show --goal 4h
+
 Focus since - Thu Jun  1 2023
 
     Su Mo Tu We Th Fr Sa
