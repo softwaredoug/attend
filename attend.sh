@@ -572,6 +572,9 @@ year_report() {
 
   echo "Focus out of max since $(date -r $data_start)"
   calendar $data_start ${minutes_per_doy[@]}
+  echo
+  echo 
+  legend "$max_minutes_per_doy"
 }
 
 if [[ "$1" == "start" ]]; then
@@ -583,7 +586,17 @@ elif [[ "$1" == "reset" ]]; then
 elif [[ "$1" == "worklog" ]]; then
   detailed "$2"
 elif [[ "$1" == "show" ]]; then
-  year_report "$2"
+  goal_mins="max"
+  echo "GOAL_MINS -- $goal_mins"
+  if [[ "$2" == "--goal" ]]; then
+    goal_mins=$(duration_arg_to_mins "$3")
+    if [[ $? -ne 0 ]]; then
+      echo "Invalid duration: $3"
+      exit 1
+    fi
+  fi
+  echo "GOAL_MINS -- $goal_mins"
+  year_report "$goal_mins"
 else
   help
 fi

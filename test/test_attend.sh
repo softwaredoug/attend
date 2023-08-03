@@ -6,6 +6,7 @@ LOG_FILE="/tmp/attend_log.txt"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
 . ./utils.sh
+. ./calendar.sh
 
 mock() {
   cp test/command_mock.sh $1_mock
@@ -581,6 +582,90 @@ test_idle_accumulates_but_resets() {
 
   if ! approx "$idle_time" 6.2; then
     echo "idle time was $idle_time"
+    return 1
+  fi
+}
+
+test_utils_duration_arg_parse_bare() {
+  duration=$(duration_arg_to_mins "50")
+  if [[ $duration != 50 ]]; then
+    echo "duration was $duration"
+    return 1
+  fi
+}
+
+test_utils_duration_arg_parse_hours() {
+  duration=$(duration_arg_to_mins "12h")
+  if [[ $duration != 720 ]]; then
+    echo "duration was $duration"
+    return 1
+  fi
+}
+
+test_utils_duration_arg_parse_mins() {
+  duration=$(duration_arg_to_mins "12m")
+  if [[ $duration != 12 ]]; then
+    echo "duration was $duration"
+    return 1
+  fi
+}
+
+test_utils_duration_arg_parse_secs() {
+  duration=$(duration_arg_to_mins "60s")
+  if ! approx $duration 1.0 0.0001; then
+    echo "duration was $duration"
+    return 1
+  fi
+}
+
+test_calendar_across_months() {
+
+  expected_output=$(
+cat <<EOF
+
+       Su Mo Tu We Th Fr Sa
+Jul 14      
+    16                ███▓▓▓
+    23 ███░░░░░░▒▒▒███░░░▒▒▒
+    30    ░░░
+
+       Su Mo Tu We Th Fr Sa
+Aug 01       ▒▒▒░░░▓▓▓
+
+EOF
+)
+
+  calendar_output=$(calendar 1689873849 100 50 100 20 24 33 99 10 25 0 11 44 12 59)
+
+  if [[ "$calendar_output" != "$expected_output" ]]; then
+    echo "calendar output was $calendar_output"
+    echo "expected output was $expected_output"
+    return 1
+  fi
+}
+
+test_calendar_all_100s() {
+
+  expected_output=$(
+cat <<EOF
+
+       Su Mo Tu We Th Fr Sa
+Jul 14      
+    16                ██████
+    23 █████████████████████
+    30 ██████
+
+       Su Mo Tu We Th Fr Sa
+Aug 01       █████████
+
+EOF
+)
+
+  calendar_output=$(calendar 1689873849 100 100 100 100 100 100 100 100 100 100 100 100 100 100)
+
+  if [[ "$calendar_output" != "$expected_output" ]]; then
+    echo "calendar output was $calendar_output"
+    echo "expected output was $expected_output"
     return 1
   fi
 }

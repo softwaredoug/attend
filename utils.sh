@@ -106,3 +106,45 @@ confirm() {
             ;;
     esac
 }
+
+duration_arg_to_mins() {
+  time_arg="$1"
+
+  if [[ "$time_arg" == "" ]]; then
+    echo "Please specify a time"
+    return 1
+  fi
+
+  # Duration ends with h, m, or s
+  if [[ "$time_arg" =~ ^[0-9]+[hms]$ ]]; then
+    # Strip off the last character
+    value=${time_arg%?}
+    units="${time_arg: -1}"
+
+    if [[ "$units" == "h" ]]; then
+      compute "$value * 60"
+      return
+    elif [[ "$units" == "s" ]]; then
+      compute "$value / 60"
+      return
+    else
+      echo $value
+      return 
+    fi
+  # Otherwise its a number...
+  elif [[ "$time_arg" =~ ^[0-9]+$ ]]; then
+    echo "$time_arg"
+    return
+  # Otherwise its invalid
+  else
+    echo "Please specify a valid time"
+    return 1
+  fi
+}
+
+to_int() {
+  # Remove period and after from string using parameter subst.
+  # ie 1.5 -> 1
+  echo "${1%%.*}"
+}
+

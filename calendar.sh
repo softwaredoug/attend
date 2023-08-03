@@ -2,6 +2,7 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 . "$SCRIPT_DIR"/fuzzy_date.sh
+. "$SCRIPT_DIR"/utils.sh
 
 
 empty_box=" "
@@ -28,7 +29,29 @@ intensity_from_percentage() {
   echo "$intensity"
 }
 
+legend() {
+  max_time="$1"
 
+  twenty_fifth=$(to_int $(compute "0.25 * $max_time"))
+  fiftieth=$(to_int $(compute "0.5 * $max_time"))
+  seventy_fifth=$(to_int $(compute "0.75 * $max_time"))
+
+  echo "Legend (mins)"
+  echo "  no data"
+  echo "$light_shade 0-$twenty_fifth mins"
+  echo "$med_shade $twenty_fifth-$fiftieth mins"
+  echo "$dark_shade $fiftieth-$seventy_fifth mins"
+  echo "$full_box $seventy_fifth-$max_time mins"
+  echo "$full_box > $max_time mins"
+}
+
+
+#
+# Display a vertical calendar 
+# of intensities per day
+# arguments are
+#  - begin_ts -> unix timestamp of first value
+#  remainder of args a list of percentage values to display
 calendar() {
   start_ts=$(fuzzy_date_range "workyear" | awk '{print $1}')
   range_end=$(fuzzy_date_range "workyear" | awk '{print $2}')
