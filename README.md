@@ -25,6 +25,15 @@ Jul
 30        
 Aug
 01        ▓▓▓▓▓▓
+
+-------------
+Legend (mins)
+" " no data
+░ 0-60 mins
+▒ 60-120 mins
+▓ 120-180 mins
+█ 180-240 mins
+█ > 240 mins
 ```
 
 More time in one app == higher score.
