@@ -226,7 +226,7 @@ output_log_line() {
 }
 
 
-report() {
+long_report() {
   line="$@"
 
   read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
@@ -333,7 +333,7 @@ report() {
 
   output "----"
   output "Most focused app: $ln_max_app"
-  output "Focused mins: $max_score_mins"
+  output "Max focused for mins: $max_score_mins"
   output "----------------------------------------"
 
   if [ ! -f $LOG_FILE ]; then
@@ -350,7 +350,7 @@ report() {
   log "work_end_ts:$ln_work_end_ts work_begin_ts:$ln_work_begin_ts work_end:$ln_work_end"
   tail -n $NUM_LINES $OUTPUT_FILE
   log "REPORT DONE... quitting"
-  exit 0
+  return 0
 }
 
 
@@ -410,7 +410,7 @@ track_focus() {
   
   output_log_line "$work_begin" "$work_begin_ts" "$session_name"
   last_line=$(tail -n 1 $LOG_FILE)
-  report "$last_line"
+  long_report "$last_line"
 }
 
 # On Ctrl+C, print the score and exit
@@ -473,12 +473,105 @@ reset() {
   echo "Done"
 }
 
+source "$SCRIPT_DIR"/fuzzy_date.sh
+source "$SCRIPT_DIR"/calendar.sh
+
+detailed() {
+  allowable_dates=("today" "yesterday" "week" "lastweek")
+  if [[ ! " ${allowable_dates[@]} " =~ " $1 " ]]; then
+    echo "Please specify a date: ${allowable_dates[@]}"
+    return 1
+  fi
+
+  date_to_begin=$(fuzzy_date_range "$1" | awk '{print $1}')
+  date_to_end=$(fuzzy_date_range "$1" | awk '{print $2}')
+  date_to_end=$((date_to_end + date_to_begin))
+
+
+  begin_formatted=$(date -r $date_to_begin)
+  end_formatted=$(date -r $date_to_end)
+
+  echo "Detailed report for $1 ($begin_formatted to $end_formatted)"
+  if [[ -f "$LOG_FILE" ]]; then
+    while read -r line; do
+
+      read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
+
+      ln_work_end_secs=$(compute "$ln_work_end / 1000")
+      if check "$ln_work_end_secs > $date_to_begin"; then
+        long_report "$line"
+      fi
+
+      #if check "$ln_work_end_secs > $date_to_end"; then
+      #  break
+      #fi
+    done < "$LOG_FILE"
+  else
+    echo "No log file found"
+  fi
+}
+
+
+year_report() {
+  # Print one line per week
+
+  # First Sunday of this year, using gdate
+  minutes_per_doy=()
+  first_day_of_year=""
+  day_of_year=0
+  data_start=0
+  if [[ -f "$LOG_FILE" ]]; then
+    while read -r line; do
+      read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
+
+      ln_work_end_secs=$(compute "$ln_work_end / 1000")
+      # Strip everything past .
+      ln_work_end_secs=${ln_work_end_secs%%.*}
+      # Get day of year for this work session
+      day_of_year=$($GDATE -d @$ln_work_end_secs +%j)
+      if [[ $first_day_of_year == "" ]]; then
+        first_day_of_year=$day_of_year
+        data_start=$ln_work_end
+        data_start=$(compute "$data_start / 1000")
+        data_start=${data_start%%.*}
+      fi
+      idx=$((day_of_year - first_day_of_year))
+      if [[ ${minutes_per_doy[$idx]} == "" ]]; then
+        minutes_per_doy[$idx]=0
+      fi
+      minutes_per_doy[$idx]=$(compute "${minutes_per_doy[$idx]} + $ln_session_length_secs / 60")
+    done < "$LOG_FILE"
+  fi
+
+  # Max minutes_per_doy
+  max_minutes_per_doy=0
+  for i in "${minutes_per_doy[@]}"; do
+    if check "$i > $max_minutes_per_doy" ; then
+      max_minutes_per_doy=$i
+    fi
+  done
+
+  # Take each relative to max
+  for i in "${!minutes_per_doy[@]}"; do
+    minutes_per_doy[$i]=$(compute "100.0 * (${minutes_per_doy[$i]} / $max_minutes_per_doy)")
+    # Truncate
+    minutes_per_doy[$i]=${minutes_per_doy[$i]%%.*}
+  done
+
+  calendar $data_start ${minutes_per_doy[@]}
+
+}
+
 if [[ "$1" == "start" ]]; then
   start "$@"
 elif [[ "$1" == "stop" ]]; then
   stop "$@"
 elif [[ "$1" == "reset" ]]; then
   reset "$@"
+elif [[ "$1" == "worklog" ]]; then
+  detailed "$2"
+elif [[ "$1" == "show" ]]; then
+  year_report
 else
   help
 fi

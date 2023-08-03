@@ -322,7 +322,7 @@ test_attend_long_focus_all_idle() {
   ./attend.sh start
   sleep 1
   ./attend.sh stop
-  max_score=$(get_stat "Focused mins")
+  max_score=$(get_stat "Max focused for mins")
 
   if ! approx $max_score 0 0.3; then
     echo "max_score: $max_score != 0"
@@ -335,7 +335,7 @@ test_attend_two_long_focus_scores_near_actual_time() {
   expected_score=6000
   ./attend.sh start
   ./attend.sh stop
-  max_score=$(get_stat "Focused mins")
+  max_score=$(get_stat "Max focused for mins")
   max_score=$(compute "$max_score * 60")
   check_gt $max_score $(echo "$expected_score - 100" | bc)
   if [[ $? -ne 0 ]]; then
