@@ -2,7 +2,7 @@
 
 [![Bash Tests](https://github.com/softwaredoug/focus/actions/workflows/test.yml/badge.svg)](https://github.com/softwaredoug/focus/actions/workflows/test.yml)
 
-Start / stop work sessions and track your "effective minutes" day to day.
+Start / stop work sessions and track your "effective focused minutes" day to day.
 
 ```
 $ attend show --goal 4h
@@ -38,8 +38,7 @@ Legend (mins)
 █ > 240 mins
 ```
 
-More time focused on one app == higher effective time on that app / task.
-
+"Focused minutes" means more time in one app. The more time you spend in that app, the more the time counts to your effective focus time. See [this graph](https://www.desmos.com/calculator/rdewcjdoab).
 
 ## Usage 
 
