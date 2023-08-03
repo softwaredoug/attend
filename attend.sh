@@ -587,7 +587,6 @@ elif [[ "$1" == "worklog" ]]; then
   detailed "$2"
 elif [[ "$1" == "show" ]]; then
   goal_mins="max"
-  echo "GOAL_MINS -- $goal_mins"
   if [[ "$2" == "--goal" ]]; then
     goal_mins=$(duration_arg_to_mins "$3")
     if [[ $? -ne 0 ]]; then
@@ -595,7 +594,6 @@ elif [[ "$1" == "show" ]]; then
       exit 1
     fi
   fi
-  echo "GOAL_MINS -- $goal_mins"
   year_report "$goal_mins"
 else
   help
