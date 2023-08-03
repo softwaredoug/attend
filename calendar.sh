@@ -4,6 +4,11 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 . "$SCRIPT_DIR"/fuzzy_date.sh
 . "$SCRIPT_DIR"/utils.sh
 
+GDATE_CMD="date"
+
+if [[ $(uname) == "Darwin" ]]; then
+  GDATE_CMD="gdate"
+fi
 
 empty_box=" "
 light_shade="░"
@@ -80,10 +85,10 @@ calendar() {
       break
     fi
     
-    day_of_week=$(gdate -d "@$start_ts" +%u)
-    day_of_month=$(gdate -d "@$start_ts" +%d)
-    name_of_month=$(gdate -d "@$start_ts" +%B)
-    name_of_month_short=$(gdate -d "@$start_ts" +%b)
+    day_of_week=$($GDATE_CMD -d "@$start_ts" +%u)
+    day_of_month=$($GDATE_CMD -d "@$start_ts" +%d)
+    name_of_month=$($GDATE_CMD -d "@$start_ts" +%B)
+    name_of_month_short=$($GDATE_CMD -d "@$start_ts" +%b)
 
     # Header
     if [[ $first_line == true ]]; then

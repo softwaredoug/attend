@@ -1,10 +1,15 @@
 #!/bin/bash
+GDATE_CMD="date"
+
+if [[ $(uname) == "Darwin" ]]; then
+  GDATE_CMD="gdate"
+fi
 
 # Function to get midnight timestamp of a date
 midnight_timestamp() {
     local formatted_date="$1"
     local timestamp
-    timestamp=$(gdate -d "$formatted_date" +%s)
+    timestamp=$($GDATE_CMD -d "$formatted_date" +%s)
     echo "$timestamp"
 }
 
@@ -12,7 +17,7 @@ midnight_timestamp() {
 is_date_a_sunday() {
   local formatted_date="$1"
   local day_of_week
-  day_of_week=$(gdate -d "$formatted_date" +%u)
+  day_of_week=$($GDATE_CMD -d "$formatted_date" +%u)
   if [[ $day_of_week == "7" ]]; then
     echo "true"
   else
@@ -23,34 +28,34 @@ is_date_a_sunday() {
 
 this_monday_midnight() {
   # Monday before today
-  midnight_timestamp "$(gdate -d "monday - 1 week" +%Y-%m-%d)"
+  midnight_timestamp "$($GDATE_CMD -d "monday - 1 week" +%Y-%m-%d)"
 }
 
 last_monday_midnight() {
-  midnight_timestamp "$(gdate -d "monday - 2 week" +%Y-%m-%d)"
+  midnight_timestamp "$($GDATE_CMD -d "monday - 2 week" +%Y-%m-%d)"
 }
 
 today_midnight() {
-  midnight_timestamp "$(gdate +%Y-%m-%d)"
+  midnight_timestamp "$($GDATE_CMD +%Y-%m-%d)"
 }
 
 yesterday_midnight() {
-  midnight_timestamp "$(gdate -d "yesterday" +%Y-%m-%d)"
+  midnight_timestamp "$($GDATE_CMD -d "yesterday" +%Y-%m-%d)"
 }
 
 first_date_of_month() {
-  midnight_timestamp "$(gdate -d "$(gdate +%Y-%m-01)" +%Y-%m-%d)"
+  midnight_timestamp "$($GDATE_CMD -d "$($GDATE_CMD +%Y-%m-01)" +%Y-%m-%d)"
 }
 
 first_sunday_at_before_year() {
   year="$1"
   if [[ $year == "" ]]; then
-    year=$(gdate +%Y)
+    year=$($GDATE_CMD +%Y)
   fi
   date="$year-01-01"
 
   while [[ $(is_date_a_sunday "$date") == "false" ]]; do
-    date=$(gdate -d "$date - 1 day" +%Y-%m-%d)
+    date=$($GDATE_CMD -d "$date - 1 day" +%Y-%m-%d)
   done
 
   midnight_timestamp "$date"
