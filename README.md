@@ -2,7 +2,7 @@
 
 [![Bash Tests](https://github.com/softwaredoug/focus/actions/workflows/test.yml/badge.svg)](https://github.com/softwaredoug/focus/actions/workflows/test.yml)
 
-Start / stop work sessions and track your focus.
+Start / stop work sessions and track your "effective minutes" day to day.
 
 ```
 $ attend show --goal 4h
@@ -38,12 +38,10 @@ Legend (mins)
 █ > 240 mins
 ```
 
-More time in one app == higher score.
+More time focused on one app == higher effective time on that app / task.
 
 
 ## Usage 
-
-(also plays a bell anytime you switch your OSX task to remind you)
 
 ```
 attend start "Review the document"
@@ -73,15 +71,25 @@ Focused mins: 28.00
 ---------------------------------------
 ```
 
+We stayed on google docs approx 28 minutes of focus time.
+
 ### Get a calendar visualization
 
 (as in above)
+
+#### Out of max
 
 ```
 attend show
 ```
 
-### Get a detailed output of a date range
+#### Relative to a goal
+
+```
+attend show --goal 4h
+```
+
+### Get a detailed output of every work item a date range
 
 ```
 attend worklog week
