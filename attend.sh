@@ -539,7 +539,8 @@ year_report() {
       if [[ ${minutes_per_doy[$idx]} == "" ]]; then
         minutes_per_doy[$idx]=0
       fi
-      minutes_per_doy[$idx]=$(compute "${minutes_per_doy[$idx]} + $ln_session_length_secs / 60")
+      effective_minutes=$(compute "$ln_TOT_SCORE / 60")
+      minutes_per_doy[$idx]=$(compute "${minutes_per_doy[$idx]} + $effective_minutes")
     done < "$LOG_FILE"
   fi
 
@@ -558,8 +559,11 @@ year_report() {
     minutes_per_doy[$i]=${minutes_per_doy[$i]%%.*}
   done
 
-  calendar $data_start ${minutes_per_doy[@]}
+  # subtract 2 months from data_start
 
+  echo "Focus out of max since $(date -r $data_start)"
+  echo ""
+  calendar $data_start ${minutes_per_doy[@]}
 }
 
 if [[ "$1" == "start" ]]; then

@@ -303,7 +303,7 @@ test_attend_long_focus_scores_near_actual_time() {
   single_focus_at_length 3000
   ./attend.sh start
   ./attend.sh stop
-  max_score=$(get_stat "Focused mins")
+  max_score=$(get_stat "Max focused for mins")
   max_score=$(compute "$max_score * 60")
   check_gt $max_score 2900
   if [[ $? -ne 0 ]]; then
@@ -376,7 +376,7 @@ test_attend_short_focus_scores_a_lot_less_than_time() {
   ./attend.sh start
   wait_for_num_calls 4 "gdate_mock"
   ./attend.sh stop
-  max_score=$(get_stat "Focused mins")
+  max_score=$(get_stat "Max focused for mins")
   check_lt "$max_score" "1"
   if [[ $? -ne 0 ]]; then
     return 1
