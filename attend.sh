@@ -219,8 +219,21 @@ output_log_line() {
 
 }
 
+LOG_LINES=()
+all_log_lines() {
+  # Read all log lines, one array entry corresponds to one line
+  if [[ -f $LOG_FILE ]] && [[ ${#LOG_LINES[@]} -eq 0 ]]; then
+    while read line; do
+      LOG_LINES+=("$line")
+    done < $LOG_FILE
+  fi
+}
+
+all_log_lines
+
 
 long_report() {
+  all_log_lines
   line="$@"
 
   read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
@@ -258,49 +271,45 @@ long_report() {
   TOT_IDLE_MINS=$(compute "$ln_TOT_IDLE / 60.0")
   TOT_IDLE_MINS=$(printf "%.2f" $TOT_IDLE_MINS)
   output "Idle mins: $TOT_IDLE_MINS"
-  
+
   assert "$work_percentage <= 100.0"
   assert "$work_percentage >= 0.0" 
 
   reporting_minutes=(5 10 20 30 45 60 90 120)
   max_percentages=(0 0 0 0 0 0 0 0)
 
-  # Compute records for each reporting minute segment from the past work sessions
-  if [[ -f "$LOG_FILE" ]]; then
-    # Loop lines in LOG_FILE to compute work_percentage per line
-    while IFS= read -r this_line; do
-      # Get the work ratio
-      log "checking line: $this_line"
-      this_work_begin_ts=$(echo $this_line | awk '{print $2}')
-      if [[ "$this_work_begin_ts" == "$ln_work_begin_ts" ]]; then
-        log "Skipping identical line $this_line"
-        continue
-      fi
-      this_session_length_secs=$(echo $this_line | awk '{print $4}')
-      this_idle_time=$(echo $this_line | awk '{print $5}')
-      # Get the session length
-      this_session_length_no_idle=$(compute "$this_session_length_secs - $this_idle_time")
-      this_score=$(echo $this_line | awk '{print $7}')
-      this_percentage=$(compute "100 * ($this_score / $this_session_length_no_idle)")
-      this_session_length_mins=$(compute "$this_session_length_secs / 60.0")
+  for this_line in "${LOG_LINES[@]}"; do
+    read this_work_end_ts this_work_begin_ts this_work_end this_session_length_secs this_TOT_IDLE this_NUM_SWITCHES this_TOT_SCORE this_avg_score this_MAX_SCORE this_max_app_no_ws this_session_name_no_ws <<< $this_line
+    # Get the work ratio
+    log "checking line: $this_line"
+    this_work_begin_ts=$(echo $this_line | awk '{print $2}')
+    if [[ "$this_work_begin_ts" == "$ln_work_begin_ts" ]]; then
+      log "Skipping identical line $this_line"
+      continue
+    fi
+    this_session_length_secs=$(echo $this_line | awk '{print $4}')
+    this_idle_time=$(echo $this_line | awk '{print $5}')
+    # Get the session length
+    this_session_length_no_idle=$(compute "$this_session_length_secs - $this_idle_time")
+    this_score=$(echo $this_line | awk '{print $7}')
+    this_percentage=$(compute "100 * ($this_score / $this_session_length_no_idle)")
+    this_session_length_mins=$(compute "$this_session_length_secs / 60.0")
 
-      # Loop through reporting_minutes
-      idx=0
-      for min_length in "${reporting_minutes[@]}"; do
-        if check "$this_session_length_mins >= $min_length"; then
-          log "this_session_length_mins: $this_session_length_mins min_length: $min_length"
-          if check "$this_percentage > ${max_percentages[$idx]}"; then
-            max_percentages[$idx]=$this_percentage
-          fi
-          assert "$this_percentage <= 100.0"
-          assert "$this_percentage >= 0.0" 
+    # Loop through reporting_minutes
+    idx=0
+    for min_length in "${reporting_minutes[@]}"; do
+      if check "$this_session_length_mins >= $min_length"; then
+        log "this_session_length_mins: $this_session_length_mins min_length: $min_length"
+        if check "$this_percentage > ${max_percentages[$idx]}"; then
+          max_percentages[$idx]=$this_percentage
         fi
-        idx=$((idx+1))
-      done
-    done < $LOG_FILE
-  else
-    log "No attend log file found at $LOG_FILE"
-  fi
+        assert "$this_percentage <= 100.0"
+        assert "$this_percentage >= 0.0" 
+      fi
+      idx=$((idx+1))
+    done
+  done
+
   tada=0
   idx=0
   for min_length in "${reporting_minutes[@]}"; do
@@ -485,7 +494,7 @@ detailed() {
     while read -r line; do
 
       read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
-      
+
       ln_work_end_secs=$(compute "$ln_work_end / 1000")
       if check "$ln_work_end_secs > $date_to_begin"; then
         long_report "$line"

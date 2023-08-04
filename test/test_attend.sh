@@ -487,13 +487,32 @@ test_doesnt_detect_high_if_not_higher() {
   fi
 }
 
-test_worklog_dumps_from_today() {
+test_worklog_dumps_only_from_today() {
   # last two values avg, max
+  twenty_four_hours_msec=86400000
   today_timestamp=$($GDATE_CMD +%Y-%m-%dT%H:%M:%S)
+  yesterday_timestamp=$($GDATE_CMD -d "yesterday" +%Y-%m-%dT%H:%M:%S)
+  tomorrow_timestamp=$($GDATE_CMD -d "tomorrow" +%Y-%m-%dT%H:%M:%S)
   today_unix=$($GDATE_CMD +%s%3N)
   work_end_unix=$(($today_unix + 30000))
-  echo "$today_timestamp $today_timestamp $work_end_unix 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app sess_name" > $LOG_FILE
-  ./attend.sh worklog today | grep "Work session:" | wc -l
+  work_end_unix2=$(($today_unix + 6000))
+
+  work_end_timestamp2=$($GDATE_CMD -d @$((work_end_unix2 / 1000)) +%Y-%m-%dT%H:%M:%S)
+  yesterday_unix=$(($today_unix - $twenty_four_hours_msec))
+  tomorrow_unix=$(($today_unix + $twenty_four_hours_msec))
+
+  echo "$yesterday_timestamp $yesterday_timestamp $yesterday_unix 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 yesterday_app sess_name" > $LOG_FILE
+  echo "$today_timestamp $today_timestamp $work_end_unix 600 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name" >> $LOG_FILE
+  echo "$work_end_timestamp2 $today_timestamp $work_end_unix2 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name_2" >> $LOG_FILE
+  echo "$tomorrow_timestamp $tomorrow_timestamp $tomorrow_unix 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app tomorrow_sess_name" >> $LOG_FILE
+
+  ./attend.sh worklog today | grep "Work session:" | wc -l | grep -q "2"
+  success=$?
+  if [[ $success -ne 0 ]]; then
+    echo "failed for today"
+    return 1
+  fi
+  ./attend.sh worklog today | grep "today sess name" | wc -l | grep -q "2"
 }
 
 test_idle() {
