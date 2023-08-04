@@ -496,14 +496,13 @@ detailed() {
       read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
 
       ln_work_end_secs=$(compute "$ln_work_end / 1000")
+      if check "$ln_work_end_secs > $date_to_end"; then
+        echo "Breaking"
+        break
+      fi
       if check "$ln_work_end_secs > $date_to_begin"; then
         long_report "$line"
       fi
-
-
-      #if check "$ln_work_end_secs > $date_to_end"; then
-      #  break
-      #fi
     done < "$LOG_FILE"
   else
     echo "No log file found"
