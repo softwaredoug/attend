@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 
-OUTPUT_FILE="/tmp/attend_output.txt"
 PID_FILE="/tmp/attend_process.pid"
 LOG_FILE="/tmp/attend_log.txt"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
 . ./utils.sh
 . ./calendar.sh
+
+GDATE_CMD="date"
+
+if [[ $(uname) == "Darwin" ]]; then
+  GDATE_CMD="gdate"
+fi
 
 mock() {
   cp test/command_mock.sh $1_mock
@@ -23,9 +28,9 @@ clean_fixtures() {
   for mock in ${MOCKS[@]}; do
     clean_mock $mock
   done
-  rm -f $OUTPUT_FILE
   rm -f $PID_FILE
   rm -f $LOG_FILE
+  rm -f /tmp/output.txt
   return
 }
 
@@ -211,7 +216,8 @@ two_apps_focused_at_length() {
 
 get_stat() {
   stat=$1
-  line=$(cat $OUTPUT_FILE | grep "^$1")
+  file=$2
+  line=$(cat $file | grep "^$1")
   [[ $line =~ ^$1:\ (.*)$ ]] && echo "${BASH_REMATCH[1]}"
 }
 
@@ -247,64 +253,37 @@ check_lt() {
 }
 
 
-test_attend_produces_output() {
-  default_returns
-
-  ./attend.sh start
-  ./attend.sh stop
-  if [[ -f $OUTPUT_FILE ]]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
 test_attend_uses_chrome_tab_hostname() {
   tab_changes
 
   ./attend.sh start
-  ./attend.sh stop
-  cat $OUTPUT_FILE | grep -q "Google Chrome || www.google.com"
+  ./attend.sh stop | grep -q "Google Chrome || www.google.com"
 }
 
 test_attend_only_one_app_has_max_app() {
   default_returns
 
   ./attend.sh start
-  ./attend.sh stop
-  cat $OUTPUT_FILE | grep -q "Terminal"
+  ./attend.sh stop | grep -q "Terminal"
 }
 
 test_attend_only_one_app_has_no_switches_app() {
   default_returns
 
   ./attend.sh start
-  ./attend.sh stop
-  num_switches=$(get_stat "Num task switches")
+  ./attend.sh stop > /tmp/output.txt
+  echo "testing"
+  cat /tmp/output.txt
+  num_switches=$(get_stat "Num task switches" /tmp/output.txt)
   check "$num_switches == 0"
-}
-
-test_attend_keeps_output() {
-  default_returns
-
-  ./attend.sh start
-  ./attend.sh stop
-  wc_first=$(cat $OUTPUT_FILE | wc -l)
-  ./attend.sh start
-  ./attend.sh stop
-  wc_second=$(cat $OUTPUT_FILE | wc -l)
-  if [[ $wc_first -lt $wc_second ]]; then
-    return 0
-  else
-    return 1
-  fi
 }
 
 test_attend_long_focus_scores_near_actual_time() {
   single_focus_at_length 3000
   ./attend.sh start
-  ./attend.sh stop
-  max_score=$(get_stat "Max focused for mins")
+  ./attend.sh stop > /tmp/output.txt
+  echo "output:"
+  max_score=$(get_stat "Max focused for mins" /tmp/output.txt)
   max_score=$(compute "$max_score * 60")
   check_gt $max_score 2900
   if [[ $? -ne 0 ]]; then
@@ -322,8 +301,8 @@ test_attend_long_focus_all_idle() {
   single_focus_all_idle 3000
   ./attend.sh start
   sleep 1
-  ./attend.sh stop
-  max_score=$(get_stat "Max focused for mins")
+  ./attend.sh stop > /tmp/output.txt
+  max_score=$(get_stat "Max focused for mins" /tmp/output.txt)
 
   if ! approx $max_score 0 0.3; then
     echo "max_score: $max_score != 0"
@@ -335,8 +314,8 @@ test_attend_two_long_focus_scores_near_actual_time() {
   two_apps_focused_at_length 3000
   expected_score=6000
   ./attend.sh start
-  ./attend.sh stop
-  max_score=$(get_stat "Max focused for mins")
+  ./attend.sh stop > /tmp/output.txt
+  max_score=$(get_stat "Max focused for mins" /tmp/output.txt)
   max_score=$(compute "$max_score * 60")
   check_gt $max_score $(echo "$expected_score - 100" | bc)
   if [[ $? -ne 0 ]]; then
@@ -354,8 +333,8 @@ test_attend_two_long_focus_scores_near_full_percentage() {
   two_apps_focused_at_length 3000
   expected_percentage_gt=99.5
   ./attend.sh start
-  ./attend.sh stop
-  percentage=$(get_stat "Effective focus %")
+  ./attend.sh stop > /tmp/output.txt
+  percentage=$(get_stat "Effective focus %" /tmp/output.txt)
   check_gt $percentage $expected_percentage_gt
   return $?
 }
@@ -363,8 +342,8 @@ test_attend_two_long_focus_scores_near_full_percentage() {
 test_attend_tracks_longest_app() {
   single_focus_at_length 3000
   ./attend.sh start
-  ./attend.sh stop
-  longest_app=$(get_stat "Most focused app")
+  ./attend.sh stop > /tmp/output.txt
+  longest_app=$(get_stat "Most focused app" /tmp/output.txt)
   echo "longest_app: $longest_app"
   focus=$($GET_FOCUS)
   if [[ $longest_app != "Google Chrome || www.google.com " ]]; then
@@ -376,8 +355,8 @@ test_attend_short_focus_scores_a_lot_less_than_time() {
   single_focus_at_length 1
   ./attend.sh start
   wait_for_num_calls 4 "gdate_mock"
-  ./attend.sh stop
-  max_score=$(get_stat "Max focused for mins")
+  ./attend.sh stop > /tmp/output.txt
+  max_score=$(get_stat "Max focused for mins" /tmp/output.txt)
   check_lt "$max_score" "1"
   if [[ $? -ne 0 ]]; then
     return 1
@@ -388,8 +367,7 @@ test_attend_output_missing_log() {
   single_focus_at_length 3000
   ./attend.sh start
   wait_for_num_calls 4 "gdate_mock"
-  ./attend.sh stop
-  cat $OUTPUT_FILE | grep -q "LOG START"
+  ./attend.sh stop | grep -q "LOG START"
   success=$?
   if [[ $success -eq 0 ]]; then
     return 1
@@ -408,15 +386,15 @@ test_detects_new_high_ratios() {
   single_focus_at_length $new_session_length_secs
   ./attend.sh start
   wait_for_num_calls 4 "gdate_mock"
-  ./attend.sh stop
+  ./attend.sh stop > /tmp/output.txt
   reporting_minutes=(5 10 20 30 45 60 90 120)
   for min_length in "${reporting_minutes[@]}"; do
     if [[ $new_session_length_mins -ge $min_length ]]; then
       echo "Check for high score... for $min_length"
-      cat $OUTPUT_FILE | grep -q " New high perc. for $min_length min session! -- $work_ratio"
+      cat /tmp/output.txt | grep -q " New high perc. for $min_length min session! -- $work_ratio"
       success=$?
     else
-      cat $OUTPUT_FILE | grep -q " New high perc. for $min_length min session! -- $work_ratio"
+      cat /tmp/output.txt | grep -q " New high perc. for $min_length min session! -- $work_ratio"
       found=$?
       [[ "$found" != 0 ]]
       success=$?
@@ -436,11 +414,11 @@ test_does_not_detect_high_ratios() {
   poor_focus
   ./attend.sh start
   wait_for_num_calls 3 "gdate_mock"
-  ./attend.sh stop
+  ./attend.sh stop > /tmp/output.txt
   reporting_minutes=(5 10 20 30 45 60 90 120)
   for min_length in "${reporting_minutes[@]}"; do
     # no records should be set
-    cat $OUTPUT_FILE | grep -q " New high perc. for $min_length min session! -- $work_ratio"
+    cat /tmp/output.txt | grep -q " New high perc. for $min_length min session! -- $work_ratio"
     found=$?
     [[ "$found" != 0 ]]
     success=$?
@@ -466,8 +444,8 @@ test_appends_to_existing_log() {
 test_prints_work_session_name() {
   single_focus_at_length 3000
   ./attend.sh start "my task to do the thing"
-  ./attend.sh stop
-  cat $OUTPUT_FILE | grep -q "my task"
+  ./attend.sh stop > /tmp/output.txt
+  cat /tmp/output.txt | grep -q "my task"
   return $?
 }
 
@@ -502,11 +480,20 @@ test_doesnt_detect_high_if_not_higher() {
   single_focus_at_length 1
   ./attend.sh start
   wait_for_num_calls 3 "gdate_mock"
-  ./attend.sh stop
-  cat $OUTPUT_FILE | grep -vq "New high max score"
+  ./attend.sh stop > /tmp/output.txt
+  cat /tmp/output.txt | grep -vq "New high max score"
   if [[ $? -ne 0 ]]; then
     return 1
   fi
+}
+
+test_worklog_dumps_from_today() {
+  # last two values avg, max
+  today_timestamp=$($GDATE_CMD +%Y-%m-%dT%H:%M:%S)
+  today_unix=$($GDATE_CMD +%s%3N)
+  work_end_unix=$(($today_unix + 30000))
+  echo "$today_timestamp $today_timestamp $work_end_unix 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app sess_name" > $LOG_FILE
+  ./attend.sh worklog today | grep "Work session:" | wc -l
 }
 
 test_idle() {

@@ -128,6 +128,9 @@ calendar() {
       idx=$((idx + 1))
     fi
     echo -n "$intensity$intensity$intensity"
+    if [[ $idx -ge ${#intensities[@]} ]]; then
+      break
+    fi
   done
   echo
 }

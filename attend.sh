@@ -25,7 +25,6 @@ CHROME_CLI=chrome-cli
 
 if [[ -f 'idle_mock' ]]; then
   LOG_FILE="/tmp/attend_log.txt"
-  OUTPUT_FILE="/tmp/attend_output.txt"
   PID_FILE="/tmp/attend_process.pid"
 
   IDLE='./idle_mock'
@@ -36,7 +35,6 @@ if [[ -f 'idle_mock' ]]; then
   CHROME_CLI="./chrome-cli_mock"
 else
   LOG_FILE="$HOME/.attend_log.txt"
-  OUTPUT_FILE="$HOME/.attend_worklog.txt"
   PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_process.pid)
 fi
 
@@ -125,11 +123,7 @@ NUM_LINES=0
 MAX_APP=""
 
 output() {
-  if [[ ! -f $OUTPUT_FILE ]]; then
-    touch $OUTPUT_FILE
-  fi
-  echo "$1" >> $OUTPUT_FILE
-  let "NUM_LINES = $NUM_LINES + 1"  
+  echo "$1"
 }
 
 
@@ -336,10 +330,6 @@ long_report() {
   output "Max focused for mins: $max_score_mins"
   output "----------------------------------------"
 
-  if [ ! -f $LOG_FILE ]; then
-    touch $LOG_FILE
-  fi
-  
   if [[ "$tada" == "1" ]]; then
     $AFPLAY "$SCRIPT_DIR"/tada.mp3
   fi
@@ -348,8 +338,6 @@ long_report() {
   max_app_no_ws=$(echo "$ln_MAX_APP" | tr -s '[:space:]' '_')
 
   log "work_end_ts:$ln_work_end_ts work_begin_ts:$ln_work_begin_ts work_end:$ln_work_end"
-  tail -n $NUM_LINES $OUTPUT_FILE
-  log "REPORT DONE... quitting"
   return 0
 }
 
@@ -409,8 +397,6 @@ track_focus() {
   log "idle killed"
   
   output_log_line "$work_begin" "$work_begin_ts" "$session_name"
-  last_line=$(tail -n 1 $LOG_FILE)
-  long_report "$last_line"
 }
 
 # On Ctrl+C, print the score and exit
@@ -442,6 +428,9 @@ stop() {
     rm $PID_FILE
     wait_for_process "$pid" $PROCESS_NAME
     echo "Process stopped"
+    last_line=$(tail -n 1 $LOG_FILE)
+    long_report "$last_line"
+    return 0
   else
     echo "No attend process running"
     exit 1
@@ -496,11 +485,12 @@ detailed() {
     while read -r line; do
 
       read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
-
+      
       ln_work_end_secs=$(compute "$ln_work_end / 1000")
       if check "$ln_work_end_secs > $date_to_begin"; then
         long_report "$line"
       fi
+
 
       #if check "$ln_work_end_secs > $date_to_end"; then
       #  break
