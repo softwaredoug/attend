@@ -1,5 +1,7 @@
 # Attend
 
+Attend is a deep-work-o-meter. You set an intention for a work session. It let's you know how well you're staying on task, what your actual effective minutes on task are, based on OSX task switches.
+
 [![Bash Tests](https://github.com/softwaredoug/focus/actions/workflows/test.yml/badge.svg)](https://github.com/softwaredoug/focus/actions/workflows/test.yml)
 
 Start / stop work sessions and track your "effective focused minutes" day to day.
