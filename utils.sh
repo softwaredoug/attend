@@ -145,5 +145,10 @@ duration_arg_to_mins() {
 to_int() {
   # Remove period and after from string using parameter subst.
   # ie 1.5 -> 1
-  echo "${1%%.*}"
+  trunced=${1%%.*}
+  # If trunked empty, give 0 as .2 -> ""
+  if [[ "$trunced" == "" ]]; then
+    trunced=0
+  fi
+  echo "$trunced"
 }

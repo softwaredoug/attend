@@ -21,7 +21,6 @@ mock() {
 clean_mock() {
   rm $1_mock
   rm -f ".last_$1_mock"_args
-
 }
 
 clean_fixtures() {
@@ -34,7 +33,7 @@ clean_fixtures() {
   return
 }
 
-MOCKS=('idle' 'focus' 'sleep' 'afplay' 'gdate' 'idle_sys' 'chrome-cli')
+MOCKS=('idle' 'focus' 'sleep' 'afplay' 'gdate' 'idle_sys' 'chrome-cli' 'calendar' 'legend')
 
 
 fixtures() {
@@ -62,6 +61,22 @@ wait_for_num_calls() {
     echo "Current calls: $(num_lines $mock_args_file)"
     sleep 1
   done
+}
+
+assert_cmd_called_with() {
+    cat ./.last_"$1"_args | grep -q "$2"
+    grep_result=$?
+    if [ $grep_result -ne 0 ]; then
+        echo "************************************"
+        echo "Expected $1 to be called with '$2'"
+        actual_output=`cat ./.last_$1_args`
+        echo "But got '$actual_output'"
+        return 1
+    fi
+}
+
+assert_calendar_called_with() {
+    assert_cmd_called_with "calendar_mock" "$@"
 }
 
 resp_on_call_count_gte() {
@@ -399,7 +414,6 @@ test_detects_new_high_ratios() {
       [[ "$found" != 0 ]]
       success=$?
     fi
-    echo "success: $success"
     if [[ $success -ne 0 ]]; then
       echo "failed for $min_length"
       return 1
@@ -409,7 +423,7 @@ test_detects_new_high_ratios() {
 
 test_does_not_detect_high_ratios() {
   echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 1210.0 6 1200.0 100.0 100.0 0.36466196014857904311 0.87642818572655602893 app sess_name" > $LOG_FILE
-  echo "2018-01-01T00:00 2018-01-01T15:40:54 3002001 3001 0 2 3000.99875332642988461642 1500.49937666321494230821 3000.99875332642988461642 an_app sess_name" >> $LOG_FILE
+  echo "2018-01-01T00:00 2018-01-01T15:40:54 1690314090000 3001 0 2 3000.99875332642988461642 1500.49937666321494230821 3000.99875332642988461642 an_app sess_name" >> $LOG_FILE
 
   poor_focus
   ./attend.sh start
@@ -422,7 +436,6 @@ test_does_not_detect_high_ratios() {
     found=$?
     [[ "$found" != 0 ]]
     success=$?
-    echo "success: $success"
     if [[ $success -ne 0 ]]; then
       echo "failed for $min_length"
       return 1
@@ -495,7 +508,7 @@ test_worklog_dumps_only_from_today() {
   tomorrow_timestamp=$($GDATE_CMD -d "tomorrow" +%Y-%m-%dT%H:%M:%S)
   today_unix=$($GDATE_CMD +%s%3N)
   work_end_unix=$(($today_unix + 30000))
-  work_end_unix2=$(($today_unix + 6000))
+  work_end_unix2=$(($work_end_unix + 6000))
 
   work_end_timestamp2=$($GDATE_CMD -d @$((work_end_unix2 / 1000)) +%Y-%m-%dT%H:%M:%S)
   yesterday_unix=$(($today_unix - $twenty_four_hours_msec - 1))
@@ -505,6 +518,9 @@ test_worklog_dumps_only_from_today() {
   echo "$today_timestamp $today_timestamp $work_end_unix 600 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name" >> $LOG_FILE
   echo "$work_end_timestamp2 $today_timestamp $work_end_unix2 600 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name_2" >> $LOG_FILE
   echo "$tomorrow_timestamp $tomorrow_timestamp $tomorrow_unix 600 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app tomorrow_sess_name" >> $LOG_FILE
+  cat $LOG_FILE
+
+  ./attend.sh worklog today
 
   ./attend.sh worklog today | grep "Work session:" | wc -l | grep -q "2"
   success=$?
@@ -513,6 +529,74 @@ test_worklog_dumps_only_from_today() {
     return 1
   fi
   ./attend.sh worklog today | grep "today sess name" | wc -l | grep -q "2"
+}
+
+test_show() {
+  # last two values avg, max
+  twenty_four_hours_msec=86400000
+  today_timestamp=$($GDATE_CMD +%Y-%m-%dT%H:%M:%S)
+  yesterday_timestamp=$($GDATE_CMD -d "yesterday" +%Y-%m-%dT%H:%M:%S)
+  tomorrow_timestamp=$($GDATE_CMD -d "tomorrow" +%Y-%m-%dT%H:%M:%S)
+  today_unix=$($GDATE_CMD +%s%3N)
+  work_end_unix=$(($today_unix + 30000))
+  work_end_unix2=$(($today_unix + 6000))
+
+  work_end_timestamp2=$($GDATE_CMD -d @$((work_end_unix2 / 1000)) +%Y-%m-%dT%H:%M:%S)
+  yesterday_unix=$(($today_unix - $twenty_four_hours_msec - 1))
+  tomorrow_unix=$(($today_unix + $twenty_four_hours_msec + 1))
+
+  # Actually use GDATE_CMD in gdate_mock
+  on_any_call "$GDATE_CMD \"\$@\"" "gdate_mock"
+
+
+  echo "2023-08-03T10:43:35 2023-08-03T10:43:35 1691073815124 600 124.2428 4 10000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 yesterday_app sess_name" > $LOG_FILE
+  echo "2023-08-04T10:43:35 2023-08-04T10:43:35 1691160215000 600 124.2428 4 10000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name" >> $LOG_FILE
+  echo "2023-08-04T10:43:41 2023-08-04T10:43:35 1691170215124 600 124.2428 4 1000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name_2" >> $LOG_FILE
+  echo "2023-08-05T10:43:35 2023-08-05T10:43:35 1691246615000 600 124.2428 4 100.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app tomorrow_sess_name" >> $LOG_FILE
+
+  ./attend.sh show
+  # 100% day 2, 90% day 1, (nearly) 0% day 3
+  echo "DONE"
+  assert_calendar_called_with "1691073815 90 100 0"
+  success=$?
+  if [[ $success -ne 0 ]]; then
+    echo "failed for today"
+    return 1
+  fi
+}
+
+test_show_skipped_day_inserts_0() {
+  # last two values avg, max
+  twenty_four_hours_msec=86400000
+  today_timestamp=$($GDATE_CMD +%Y-%m-%dT%H:%M:%S)
+  yesterday_timestamp=$($GDATE_CMD -d "yesterday" +%Y-%m-%dT%H:%M:%S)
+  tomorrow_timestamp=$($GDATE_CMD -d "tomorrow" +%Y-%m-%dT%H:%M:%S)
+  today_unix=$($GDATE_CMD +%s%3N)
+  work_end_unix=$(($today_unix + 30000))
+  work_end_unix2=$(($today_unix + 6000))
+
+  work_end_timestamp2=$($GDATE_CMD -d @$((work_end_unix2 / 1000)) +%Y-%m-%dT%H:%M:%S)
+  yesterday_unix=$(($today_unix - $twenty_four_hours_msec - 1))
+  tomorrow_unix=$(($today_unix + $twenty_four_hours_msec + 1))
+
+  # Actually use GDATE_CMD in gdate_mock
+  on_any_call "$GDATE_CMD \"\$@\"" "gdate_mock"
+
+
+  # Skip aug 3rd
+  echo "2023-08-02T10:43:35 2023-08-02T10:43:35 1690987415521 600 124.2428 4 10000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 yesterday_app sess_name" > $LOG_FILE
+  echo "2023-08-04T10:43:35 2023-08-04T10:43:35 1691160215000 600 124.2428 4 10000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name" >> $LOG_FILE
+  echo "2023-08-04T10:43:41 2023-08-04T10:43:35 1691170215124 600 124.2428 4 1000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name_2" >> $LOG_FILE
+  echo "2023-08-05T10:43:35 2023-08-05T10:43:35 1691246615000 600 124.2428 4 100.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app tomorrow_sess_name" >> $LOG_FILE
+
+  ./attend.sh show
+  # 100% day 2, 90% day 1, (nearly) 0% day 3
+  assert_calendar_called_with "1690987415 90 0 100 0"
+  success=$?
+  if [[ $success -ne 0 ]]; then
+    echo "failed for today"
+    return 1
+  fi
 }
 
 test_idle() {

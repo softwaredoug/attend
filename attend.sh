@@ -33,7 +33,14 @@ if [[ -f 'idle_mock' ]]; then
   AFPLAY="./afplay_mock"
   GDATE="./gdate_mock"
   CHROME_CLI="./chrome-cli_mock"
+  CALENDAR="./calendar_mock"
+  LEGEND="./legend_mock"
 else
+  . "$SCRIPT_DIR"/calendar.sh
+
+  CALENDAR=calendar
+  LEGEND=legend
+
   LOG_FILE="$HOME/.attend_log.txt"
   PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_process.pid)
 fi
@@ -43,6 +50,7 @@ MS_PATTERN="+%s%3N"
 IDLE_TIME_FILE="/tmp/total_idle_time"
 
 . "$SCRIPT_DIR"/utils.sh
+. "$SCRIPT_DIR"/fuzzy_date.sh
 . "$SCRIPT_DIR"/log.sh
 
 log "LOG START"
@@ -222,9 +230,17 @@ output_log_line() {
 LOG_LINES=()
 all_log_lines() {
   # Read all log lines, one array entry corresponds to one line
+  last_work_end=0
   if [[ -f $LOG_FILE ]] && [[ ${#LOG_LINES[@]} -eq 0 ]]; then
     while read line; do
       LOG_LINES+=("$line")
+      read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
+      if [[ "$ln_work_end" -le "$last_work_end" ]]; then
+        echo "🚨 ERROR: Log file is not sorted by timestamp. Please fix this manually."
+        echo "reset with attend reset"
+        exit 1
+      fi
+      last_work_end=$ln_work_end
     done < $LOG_FILE
   fi
 }
@@ -471,9 +487,6 @@ reset() {
   echo "Done"
 }
 
-source "$SCRIPT_DIR"/fuzzy_date.sh
-source "$SCRIPT_DIR"/calendar.sh
-
 detailed() {
   allowable_dates=("today" "yesterday" "week" "lastweek")
   if [[ ! " ${allowable_dates[@]} " =~ " $1 " ]]; then
@@ -510,41 +523,49 @@ detailed() {
 }
 
 
-year_report() {
+show() {
   # Print one line per week
   out_of="$1"
   if [[ "$out_of" == "" ]]; then
     out_of="max"
   fi
 
-  # First Sunday of this year, using gdate
   minutes_per_doy=()
   first_day_of_year=""
   day_of_year=0
   data_start=0
-  if [[ -f "$LOG_FILE" ]]; then
-    while read -r line; do
-      read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $line
+  last_doy_in_log=0
+  for this_line in "${LOG_LINES[@]}"; do
+    read ln_work_end_ts ln_work_begin_ts ln_work_end ln_session_length_secs ln_TOT_IDLE ln_NUM_SWITCHES ln_TOT_SCORE ln_avg_score ln_MAX_SCORE ln_max_app_no_ws ln_session_name_no_ws <<< $this_line
 
-      ln_work_end_secs=$(compute "$ln_work_end / 1000")
-      # Strip everything past .
-      ln_work_end_secs=${ln_work_end_secs%%.*}
-      # Get day of year for this work session
-      day_of_year=$($GDATE -d @$ln_work_end_secs +%j)
-      if [[ $first_day_of_year == "" ]]; then
-        first_day_of_year=$day_of_year
-        data_start=$ln_work_end
-        data_start=$(compute "$data_start / 1000")
-        data_start=${data_start%%.*}
-      fi
-      idx=$((day_of_year - first_day_of_year))
-      if [[ ${minutes_per_doy[$idx]} == "" ]]; then
-        minutes_per_doy[$idx]=0
-      fi
-      effective_minutes=$(compute "$ln_TOT_SCORE / 60")
-      minutes_per_doy[$idx]=$(compute "${minutes_per_doy[$idx]} + $effective_minutes")
-    done < "$LOG_FILE"
-  fi
+    ln_work_end_secs=$(to_int $(compute "$ln_work_end / 1000"))
+    # Strip everything past .
+    ln_work_end_secs=${ln_work_end_secs%%.*}
+    # Get day of year for this work session
+    day_of_year=$($GDATE -d @$ln_work_end_secs +%j)
+    if [[ $first_day_of_year == "" ]]; then
+      first_day_of_year=$day_of_year
+      data_start=$ln_work_end
+      data_start=$(compute "$data_start / 1000")
+      data_start=${data_start%%.*}
+    fi
+    idx=$((day_of_year - first_day_of_year))
+    if [[ ${minutes_per_doy[$idx]} == "" ]]; then
+      minutes_per_doy[$idx]=0
+    fi
+    effective_minutes=$(compute "$ln_TOT_SCORE / 60")
+    minutes_per_doy[$idx]=$(compute "${minutes_per_doy[$idx]} + $effective_minutes")
+    last_doy_in_log=$day_of_year
+  done < "$LOG_FILE"
+
+  # Loop from first day of year to last day of year
+  # If we have no data for a day, set it to 0
+  for ((i=$first_day_of_year; i<=$last_doy_in_log; i++)); do
+    idx=$((i - first_day_of_year))
+    if [[ ${minutes_per_doy[$idx]} == "" ]]; then
+      minutes_per_doy[$idx]=0
+    fi
+  done
 
   # Max minutes_per_doy
 
@@ -563,16 +584,16 @@ year_report() {
   for i in "${!minutes_per_doy[@]}"; do
     minutes_per_doy[$i]=$(compute "100.0 * (${minutes_per_doy[$i]} / $max_minutes_per_doy)")
     # Truncate
-    minutes_per_doy[$i]=${minutes_per_doy[$i]%%.*}
+    minutes_per_doy[$i]=$(to_int ${minutes_per_doy[$i]})
   done
 
   # subtract 2 months from data_start
 
   echo "Focus out of max since $(date -r $data_start)"
-  calendar $data_start ${minutes_per_doy[@]}
+  $CALENDAR $data_start ${minutes_per_doy[@]}
   echo
   echo 
-  legend "$max_minutes_per_doy"
+  $LEGEND "$max_minutes_per_doy"
 }
 
 if [[ "$1" == "start" ]]; then
@@ -592,7 +613,7 @@ elif [[ "$1" == "show" ]]; then
       exit 1
     fi
   fi
-  year_report "$goal_mins"
+  show "$goal_mins"
 else
   help
 fi
