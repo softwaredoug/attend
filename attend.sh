@@ -547,7 +547,7 @@ show() {
       first_day_of_year=$day_of_year
       data_start=$ln_work_end
       data_start=$(compute "$data_start / 1000")
-      data_start=${data_start%%.*}
+      data_start=$(to_int $data_start)
     fi
     idx=$((day_of_year - first_day_of_year))
     if [[ ${minutes_per_doy[$idx]} == "" ]]; then
@@ -557,6 +557,7 @@ show() {
     minutes_per_doy[$idx]=$(compute "${minutes_per_doy[$idx]} + $effective_minutes")
     last_doy_in_log=$day_of_year
   done < "$LOG_FILE"
+
 
   # Loop from first day of year to last day of year
   # If we have no data for a day, set it to 0
@@ -579,13 +580,14 @@ show() {
   else
     max_minutes_per_doy="$1"
   fi
-
+  
   # Take each relative to max
   for i in "${!minutes_per_doy[@]}"; do
     minutes_per_doy[$i]=$(compute "100.0 * (${minutes_per_doy[$i]} / $max_minutes_per_doy)")
     # Truncate
     minutes_per_doy[$i]=$(to_int ${minutes_per_doy[$i]})
   done
+
 
   # subtract 2 months from data_start
 

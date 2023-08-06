@@ -55,40 +55,42 @@ legend() {
 # Display a vertical calendar 
 # of intensities per day
 # arguments are
-#  - begin_ts -> unix timestamp of first value
+#  - begin_unix -> unix timestamp of first value
 #  remainder of args a list of percentage values to display
 calendar() {
-  start_ts=$(fuzzy_date_range "workyear" | awk '{print $1}')
+  start_unix=$(fuzzy_date_range "workyear" | awk '{print $1}')
   range_end=$(fuzzy_date_range "workyear" | awk '{print $2}')
-  range_end=$((range_end + start_ts))
+  range_end=$((range_end + start_unix))
 
 
   intensities=("${@}")
-  begin_data_ts="$1"
-  # Subtract 7 days from begin_ts
-  begin_display_ts=$((begin_data_ts - 604800))
+  begin_data_unix="$1"
+  # Round begin data to beginning of day
+  begin_data_unix=$((begin_data_unix - (begin_data_unix % 86400)))
+  # Subtract 7 days from begin_unix
+  begin_display_unix=$((begin_data_unix - 604800))
   now=$(date +%s)
   idx=1
   first_line=true
 
 
   # Iterate every day of year up to range_end
-  while [[ $start_ts -lt $range_end ]]; do
+  while [[ $start_unix -lt $range_end ]]; do
     # Get day of week
-    start_ts=$((start_ts + 86400))
+    start_unix=$((start_unix + 86400))
 
-    if [[ $start_ts -lt $begin_display_ts ]]; then
+    if [[ $start_unix -lt $begin_display_unix ]]; then
       continue
     fi
 
-    if [[ $start_ts -gt $now ]]; then
+    if [[ $start_unix -gt $now ]]; then
       break
     fi
     
-    day_of_week=$($GDATE_CMD -d "@$start_ts" +%u)
-    day_of_month=$($GDATE_CMD -d "@$start_ts" +%d)
-    name_of_month=$($GDATE_CMD -d "@$start_ts" +%B)
-    name_of_month_short=$($GDATE_CMD -d "@$start_ts" +%b)
+    day_of_week=$($GDATE_CMD -d "@$start_unix" +%u)
+    day_of_month=$($GDATE_CMD -d "@$start_unix" +%d)
+    name_of_month=$($GDATE_CMD -d "@$start_unix" +%B)
+    name_of_month_short=$($GDATE_CMD -d "@$start_unix" +%b)
 
     # Header
     if [[ $first_line == true ]]; then
@@ -123,7 +125,9 @@ calendar() {
     fi
 
     intensity=" "
-    if [[ $start_ts -ge $begin_data_ts ]]; then
+    # echo "start_unix: $start_unix"
+    # echo "begin_data_unix: $begin_data_unix"
+    if [[ $start_unix -ge $begin_data_unix ]]; then
       intensity=$(intensity_from_percentage "${intensities[$idx]}")
       idx=$((idx + 1))
     fi

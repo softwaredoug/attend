@@ -714,13 +714,13 @@ test_calendar_across_months() {
 cat <<EOF
 
        Su Mo Tu We Th Fr Sa
-Jul 14      
-    16                ███▓▓▓
-    23 ███░░░░░░▒▒▒███░░░▒▒▒
-    30    ░░░
+Jul 13         
+    16             ███▓▓▓███
+    23 ░░░░░░▒▒▒███░░░▒▒▒   
+    30 ░░░▒▒▒
 
        Su Mo Tu We Th Fr Sa
-Aug 01       ▒▒▒░░░▓▓▓
+Aug 01       ░░░▓▓▓
 
 EOF
 )
@@ -740,19 +740,44 @@ test_calendar_all_100s() {
 cat <<EOF
 
        Su Mo Tu We Th Fr Sa
-Jul 14      
-    16                ██████
+Jul 13         
+    16             █████████
     23 █████████████████████
     30 ██████
 
        Su Mo Tu We Th Fr Sa
-Aug 01       █████████
+Aug 01       ██████
 
 EOF
 )
 
   calendar_output=$(calendar 1689873849 100 100 100 100 100 100 100 100 100 100 100 100 100 100)
 
+  if [[ "$calendar_output" != "$expected_output" ]]; then
+    echo "calendar output was $calendar_output"
+    echo "expected output was $expected_output"
+    return 1
+  fi
+}
+
+test_calendar_rounds_begin_data_to_24hrs() {
+
+  expected_output=$(
+cat <<EOF
+
+       Su Mo Tu We Th Fr Sa
+Jul 24                  
+    30    ░░░
+
+       Su Mo Tu We Th Fr Sa
+Aug 01       ███▓▓▓▓▓▓░░░   
+    06 ▒▒▒
+
+EOF
+)
+
+
+  calendar_output=$(calendar 1690837453 3 100 68 68 20 0 27)
   if [[ "$calendar_output" != "$expected_output" ]]; then
     echo "calendar output was $calendar_output"
     echo "expected output was $expected_output"
