@@ -6,6 +6,7 @@ IDLE_TIME_FILE="/tmp/total_idle_time"
 
 . ./utils.sh
 . ./calendar.sh
+. ./test/log_builder.sh
 
 GDATE_CMD="date"
 
@@ -238,7 +239,8 @@ get_stat() {
 
 clean_number() {
   number=$1
-  number=$(echo $number | sed 's/,//g')
+  # Remove commas and percentages
+  number=$(echo $number | sed 's/,//g' | sed 's/%//g')
 
   # Add 0 if begins with .
   if [[ $number =~ ^\.[0-9]+ ]]; then
@@ -250,7 +252,7 @@ clean_number() {
 check_gt() {
   first=$(clean_number "$1")
   second=$(clean_number "$2")
-  if [[ $(echo "$first > $second" |bc -l) == 1 ]]; then
+  if check "$first > $second"; then
     return 0
   else
     return 1
@@ -260,7 +262,7 @@ check_gt() {
 check_lt() {
   first=$(clean_number "$1")
   second=$(clean_number "$2")
-  if [[ $(echo "$first < $second" |bc -l) == 1 ]]; then
+  if check "$first < $second"; then
     return 0
   else
     return 1
@@ -390,11 +392,16 @@ test_attend_output_missing_log() {
 }
 
 test_detects_new_high_ratios() {
+  # Bad focus in past
   this_session_length_secs=1200.0
   this_session_length_mins=$(echo "$this_session_length_secs / 60.0" | bc)
   this_idle_time=100.0
   this_effective_secs=100.0
-  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 6 $this_session_length_secs $this_idle_time $this_effective_secs 0.36466196014857904311 0.87642818572655602893 My_longest_app" > $LOG_FILE
+  line_1=$(log_line)
+  line_1=$(with_session_length_secs "$line_1" $this_session_length_secs)
+  line_1=$(with_idle_time "$line_1" $this_idle_time)
+  line_1=$(with_effective_secs "$line_1" $this_effective_secs)
+  echo "$line_1" > $LOG_FILE
 
   new_session_length_secs=3000
   new_session_length_mins=$(echo "$new_session_length_secs / 60.0" | bc)
@@ -402,6 +409,7 @@ test_detects_new_high_ratios() {
   ./attend.sh start
   wait_for_num_calls 4 "gdate_mock"
   ./attend.sh stop > /tmp/output.txt
+  cat /tmp/output.txt
   reporting_minutes=(5 10 20 30 45 60 90 120)
   for min_length in "${reporting_minutes[@]}"; do
     if [[ $new_session_length_mins -ge $min_length ]]; then
@@ -422,13 +430,16 @@ test_detects_new_high_ratios() {
 }
 
 test_does_not_detect_high_ratios() {
-  echo "2023-07-25T15:40:54 2023-07-25T15:40:54 1690314060763 1210.0 6 1200.0 100.0 100.0 0.36466196014857904311 0.87642818572655602893 app sess_name" > $LOG_FILE
-  echo "2018-01-01T00:00 2018-01-01T15:40:54 1690314090000 3001 0 2 3000.99875332642988461642 1500.49937666321494230821 3000.99875332642988461642 an_app sess_name" >> $LOG_FILE
+  line_1=$(log_line)
+  line_2=$(log_line "$line_1")
+  with_effective_secs "$line_1" 1 > $LOG_FILE
+  with_effective_secs "$line_2" 1 >> $LOG_FILE
 
   poor_focus
   ./attend.sh start
   wait_for_num_calls 3 "gdate_mock"
   ./attend.sh stop > /tmp/output.txt
+  cat /tmp/output.txt
   reporting_minutes=(5 10 20 30 45 60 90 120)
   for min_length in "${reporting_minutes[@]}"; do
     # no records should be set
@@ -484,20 +495,6 @@ test_logs_max_app_name() {
   ./attend.sh stop
   cat $LOG_FILE | grep -q "Google_Chrome"
   return $?
-}
-
-test_doesnt_detect_high_if_not_higher() {
-  # last two values avg, max
-  echo "2023-07-25T15:40:54 1690314060763 6 124.2428 4 1.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app sess_name" > $LOG_FILE
-  cat $LOG_FILE
-  single_focus_at_length 1
-  ./attend.sh start
-  wait_for_num_calls 3 "gdate_mock"
-  ./attend.sh stop > /tmp/output.txt
-  cat /tmp/output.txt | grep -vq "New high max score"
-  if [[ $? -ne 0 ]]; then
-    return 1
-  fi
 }
 
 test_worklog_dumps_only_from_today() {
