@@ -51,7 +51,7 @@ IDLE_TIME_FILE="/tmp/total_idle_time"
 
 . "$SCRIPT_DIR"/utils.sh
 . "$SCRIPT_DIR"/fuzzy_date.sh
-. "$SCRIPT_DIR"/log.sh
+. "$SCRIPT_DIR"/log_debug.sh
 
 log "LOG START"
 
@@ -294,6 +294,8 @@ long_report() {
   reporting_minutes=(5 10 20 30 45 60 90 120)
   max_percentages=(0 0 0 0 0 0 0 0)
 
+  # Get perf counter
+  _perf_start=$(date +%s%N)
   for this_line in "${LOG_LINES[@]}"; do
     read this_work_end_ts this_work_begin_ts this_work_end this_session_length_secs this_TOT_IDLE this_NUM_SWITCHES this_TOT_SCORE this_avg_score this_MAX_SCORE this_max_app_no_ws this_session_name_no_ws <<< $this_line
     # Get the work ratio
@@ -325,6 +327,8 @@ long_report() {
       idx=$((idx+1))
     done
   done
+  _perf_stop=$(date +%s%N)
+  log "perf: $((_perf_stop - _perf_start))"
 
   tada=0
   idx=0
@@ -369,6 +373,7 @@ long_report() {
 
 track_focus() {
   session_name="$1"
+  tone="$2"
   log "TRACK FOCUS STARTING"
   rm -f $IDLE_TIME_FILE
   
@@ -398,7 +403,9 @@ track_focus() {
       if [ "$focus" != "$lastfocus" ]; then
           log "FOCUS SWITCH $lastfocus -> $focus"
           # play unpleasant sound
-          $AFPLAY /System/Library/Sounds/Funk.aiff
+          if [[ $tone == "switch" ]]; then
+            $AFPLAY /System/Library/Sounds/Funk.aiff
+          fi
           # if the last focused app is not empty
           # get the current time in milliseconds
           if [ "$lastfocus" != "" ]; then
@@ -428,16 +435,46 @@ track_focus() {
 
 
 start() {
+  tone=""
+  session_name=""
+  for arg in "$@"; do
+    echo $arg
+    case "$arg" in
+      "--nanny")
+        if [[ $tone == "" ]]; then
+          tone="switch"
+        else
+          echo "tone already set to $tone"
+          echo "only one of --nanny or --silent can be specified"
+        fi
+        ;;
+      "--silent")
+        if [[ $tone == "" ]]; then
+          tone="none"
+        else
+          echo "tone already set to $tone"
+          echo "only one of --nanny or --silent can be specified"
+        fi
+        ;;
+      *)
+        session_name="$arg"
+        echo "session_name: $arg"
+        ;;
+    esac
+  done
+
+  echo "tone: $tone"
   if [[ -f $PID_FILE ]]; then
     echo "Focus already running"
     exit 1
   fi
   touch $PID_FILE
-  session_name="$2"
   if [[ "$session_name" == "" ]]; then
     session_name="Unnamed Work Session"
   fi
-  track_focus "$2" & 
+  # track_focus "$session_name" "$tone" & 
+  echo "sess_name:$session_name , tone:$tone"
+  exit 0
   pid=$!
   echo "$pid" > $PID_FILE
   while [[ ! -f $IDLE_TIME_FILE ]] ; do
@@ -598,20 +635,22 @@ show() {
   $LEGEND "$max_minutes_per_doy"
 }
 
-if [[ "$1" == "start" ]]; then
-  start "$@"
-elif [[ "$1" == "stop" ]]; then
+cmd="$1"
+shift
+if [[ "$cmd" == "start" ]]; then
+  start "$@" 
+elif [[ "$cmd" == "stop" ]]; then
   stop "$@"
-elif [[ "$1" == "reset" ]]; then
+elif [[ "$cmd" == "reset" ]]; then
   reset "$@"
-elif [[ "$1" == "worklog" ]]; then
-  detailed "$2"
-elif [[ "$1" == "show" ]]; then
+elif [[ "$cmd" == "worklog" ]]; then
+  detailed "$@"
+elif [[ "$cmd" == "show" ]]; then
   goal_mins="max"
-  if [[ "$2" == "--goal" ]]; then
-    goal_mins=$(duration_arg_to_mins "$3")
+  if [[ "$1" == "--goal" ]]; then
+    goal_mins=$(duration_arg_to_mins "$2")
     if [[ $? -ne 0 ]]; then
-      echo "Invalid duration: $3"
+      echo "Invalid duration: $2"
       exit 1
     fi
   fi
