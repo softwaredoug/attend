@@ -42,6 +42,7 @@ else
   LEGEND=legend
 
   LOG_FILE="$HOME/.attend_log.txt"
+  TODO_LIST="$HOME/.attend_todo_list.txt"
   PID_FILE=$(echo $(getconf DARWIN_USER_TEMP_DIR)/attend_process.pid)
 fi
 
@@ -454,7 +455,48 @@ track_focus() {
   output_log_line "$work_begin" "$work_begin_ts" "$session_name"
 }
 
-# On Ctrl+C, print the score and exit
+todo() {
+  # No TODO_LIST, touch it
+  if [[ ! -f "$TODO_LIST" ]]; then
+    touch "$TODO_LIST"
+  fi
+  # No args, cat TODO_LIST
+  # Arg is 'done' with an id, remove from TODO_LIST
+  # Any other args, add to TODO_LIST, with numeric identifier
+  if [[ "$1" == "" ]]; then
+    # If not empty
+    if [[ -s "$TODO_LIST" ]]; then
+      echo "TODO LIST:"
+      cat "$TODO_LIST"
+    fi
+  elif [[ "$1" == "done" ]]; then
+    todo_id="$2"
+    if [[ "$todo_id" == "" ]]; then
+      echo "No todo id specified"
+      return 1
+    fi
+    if [[ ! "$todo_id" =~ ^[0-9]+$ ]]; then
+      echo "Invalid todo id: $todo_id"
+      return 1
+    fi
+    # Get the matching line for display
+    todo_item=$(grep "^$todo_id," "$TODO_LIST")
+    if [[ "$todo_item" == "" ]]; then
+      echo "No todo item with id: $todo_id"
+      return 1
+    fi
+    echo "Removing todo item: $todo_item"
+    # Find the line with that id followed by comma and remove it
+    sed -i '' "/^$todo_id,/d" "$TODO_LIST"
+  else
+    local todo_id
+    local todo_item
+    todo_id=$(trim $(wc -l < "$TODO_LIST"))
+    todo_item="$@"
+    echo "$todo_id,$todo_item" >> "$TODO_LIST"
+    echo "Added todo item: $todo_item"
+  fi
+}
 
 
 start() {
@@ -467,6 +509,7 @@ start() {
   if [[ "$session_name" == "" ]]; then
     session_name="Unnamed Work Session"
   fi
+  todo
   track_focus "$2" & 
   pid=$!
   echo "$pid" > $PID_FILE
@@ -494,7 +537,7 @@ stop() {
 }
 
 help() {
-  echo "Usage: attend [start|stop]"
+  echo "Usage: attend [start|stop|todo|worklog|report|reset|help]"
   echo ""
   echo "  start: start tracking your focus"
   echo "  start \"Session Name\": start tracking your focus with a custom session name"
@@ -513,8 +556,8 @@ reset() {
   confirm "Resetting will delete all your work logs. Are you sure you want to reset?" || return 1
   echo ""
   echo "Resetting attend..."
-  rm -f $OUTPUT_FILE
-  rm -f $LOG_FILE
+  rm -f "$OUTPUT_FILE"
+  rm -f "$LOG_FILE"
   echo "Done"
 }
 
@@ -616,14 +659,14 @@ show() {
   for i in "${!minutes_per_doy[@]}"; do
     minutes_per_doy[$i]=$(compute "100.0 * (${minutes_per_doy[$i]} / $max_minutes_per_doy)")
     # Truncate
-    minutes_per_doy[$i]=$(to_int ${minutes_per_doy[$i]})
+    minutes_per_doy[$i]=$(to_int "${minutes_per_doy[$i]}")
   done
 
 
   # subtract 2 months from data_start
 
-  echo "Focus out of max since $(date -r $data_start)"
-  $CALENDAR $data_start ${minutes_per_doy[@]}
+  echo "Focus out of max since $(date -r "$data_start")"
+  $CALENDAR "$data_start" "${minutes_per_doy[@]}"
   echo
   echo 
   $LEGEND "$max_minutes_per_doy"
@@ -637,11 +680,12 @@ elif [[ "$1" == "reset" ]]; then
   reset "$@"
 elif [[ "$1" == "worklog" ]]; then
   detailed "$2"
+elif [[ "$1" == "todo" ]]; then
+  todo "$2" "$3"
 elif [[ "$1" == "show" ]]; then
   goal_mins="max"
   if [[ "$2" == "--goal" ]]; then
-    goal_mins=$(duration_arg_to_mins "$3")
-    if [[ $? -ne 0 ]]; then
+    if goal_mins=$(duration_arg_to_mins "$3"); then
       echo "Invalid duration: $3"
       exit 1
     fi
