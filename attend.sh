@@ -685,8 +685,9 @@ elif [[ "$1" == "todo" ]]; then
 elif [[ "$1" == "show" ]]; then
   goal_mins="max"
   if [[ "$2" == "--goal" ]]; then
-    if goal_mins=$(duration_arg_to_mins "$3"); then
+    if ! goal_mins=$(duration_arg_to_mins "$3"); then
       echo "Invalid duration: $3"
+      echo "$goal_mins"
       exit 1
     fi
   fi

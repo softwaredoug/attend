@@ -123,18 +123,18 @@ duration_arg_to_mins() {
 
     if [[ "$units" == "h" ]]; then
       compute "$value * 60"
-      return
+      return 0
     elif [[ "$units" == "s" ]]; then
       compute "$value / 60"
-      return
+      return 0
     else
-      echo $value
-      return 
+      echo "$value"
+      return 0
     fi
   # Otherwise its a number...
   elif [[ "$time_arg" =~ ^[0-9]+$ ]]; then
     echo "$time_arg"
-    return
+    return 0
   # Otherwise its invalid
   else
     echo "Please specify a valid time"

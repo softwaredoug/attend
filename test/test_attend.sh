@@ -596,6 +596,73 @@ test_show_skipped_day_inserts_0() {
   fi
 }
 
+test_show_with_duration() {
+  # last two values avg, max
+  twenty_four_hours_msec=86400000
+  today_timestamp=$($GDATE_CMD +%Y-%m-%dT%H:%M:%S)
+  yesterday_timestamp=$($GDATE_CMD -d "yesterday" +%Y-%m-%dT%H:%M:%S)
+  tomorrow_timestamp=$($GDATE_CMD -d "tomorrow" +%Y-%m-%dT%H:%M:%S)
+  today_unix=$($GDATE_CMD +%s%3N)
+  work_end_unix=$(($today_unix + 30000))
+  work_end_unix2=$(($today_unix + 6000))
+
+  work_end_timestamp2=$($GDATE_CMD -d @$((work_end_unix2 / 1000)) +%Y-%m-%dT%H:%M:%S)
+  yesterday_unix=$(($today_unix - $twenty_four_hours_msec - 1))
+  tomorrow_unix=$(($today_unix + $twenty_four_hours_msec + 1))
+
+  # Actually use GDATE_CMD in gdate_mock
+  on_any_call "$GDATE_CMD \"\$@\"" "gdate_mock"
+
+
+  # Skip aug 3rd
+  echo "2023-08-02T10:43:35 2023-08-02T10:43:35 1690987415521 600 124.2428 4 10000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 yesterday_app sess_name" > $LOG_FILE
+  echo "2023-08-04T10:43:35 2023-08-04T10:43:35 1691160215000 600 124.2428 4 10000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name" >> $LOG_FILE
+  echo "2023-08-04T10:43:41 2023-08-04T10:43:35 1691170215124 600 124.2428 4 1000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name_2" >> $LOG_FILE
+  echo "2023-08-05T10:43:35 2023-08-05T10:43:35 1691246615000 600 124.2428 4 100.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app tomorrow_sess_name" >> $LOG_FILE
+
+  ./attend.sh show --goal 4h > /dev/null 2>&1
+  # Everything scaled down to 4h
+  # 100% day 2, 90% day 1, (nearly) 0% day 3
+  assert_calendar_called_with "1690987415 69 0 76 0"
+  success=$?
+  if [[ $success -ne 0 ]]; then
+    return 1
+  fi
+}
+
+test_show_with_invalid_duration() {
+  # last two values avg, max
+  twenty_four_hours_msec=86400000
+  today_timestamp=$($GDATE_CMD +%Y-%m-%dT%H:%M:%S)
+  yesterday_timestamp=$($GDATE_CMD -d "yesterday" +%Y-%m-%dT%H:%M:%S)
+  tomorrow_timestamp=$($GDATE_CMD -d "tomorrow" +%Y-%m-%dT%H:%M:%S)
+  today_unix=$($GDATE_CMD +%s%3N)
+  work_end_unix=$(($today_unix + 30000))
+  work_end_unix2=$(($today_unix + 6000))
+
+  work_end_timestamp2=$($GDATE_CMD -d @$((work_end_unix2 / 1000)) +%Y-%m-%dT%H:%M:%S)
+  yesterday_unix=$(($today_unix - $twenty_four_hours_msec - 1))
+  tomorrow_unix=$(($today_unix + $twenty_four_hours_msec + 1))
+
+  # Actually use GDATE_CMD in gdate_mock
+  on_any_call "$GDATE_CMD \"\$@\"" "gdate_mock"
+
+
+  # Skip aug 3rd
+  echo "2023-08-02T10:43:35 2023-08-02T10:43:35 1690987415521 600 124.2428 4 10000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 yesterday_app sess_name" > $LOG_FILE
+  echo "2023-08-04T10:43:35 2023-08-04T10:43:35 1691160215000 600 124.2428 4 10000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name" >> $LOG_FILE
+  echo "2023-08-04T10:43:41 2023-08-04T10:43:35 1691170215124 600 124.2428 4 1000.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app today_sess_name_2" >> $LOG_FILE
+  echo "2023-08-05T10:43:35 2023-08-05T10:43:35 1691246615000 600 124.2428 4 100.45864784059431617247 0.36466196014857904311 0.87642818572655602893 app tomorrow_sess_name" >> $LOG_FILE
+
+  ./attend.sh show --goal 14f > /dev/null 2>&1
+  # Everything scaled down to 4h
+  # 100% day 2, 90% day 1, (nearly) 0% day 3
+  success=$?
+  if [[ $success -ne 1 ]]; then
+    return 1
+  fi
+}
+
 test_idle() {
   resp_on_call_count 1 'echo "1"' idle_sys_mock
   resp_on_call_count 2 'echo "2"' idle_sys_mock
