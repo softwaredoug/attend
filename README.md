@@ -96,14 +96,13 @@ attend show --goal 4h
 attend worklog week
 ```
 
-## Knows issues
-
-* Idle time does not always account for when your Mac goes to sleep
-
-
 ## Install
 
 ```
 brew tap softwaredoug/attend
 brew install attend
 ```
+
+## Known issues
+
+* Idle time does not always account for when your Mac goes to sleep
